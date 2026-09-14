@@ -82,6 +82,13 @@
           </button>
         </div>
 
+        <div class="profile-theme-row">
+          <span class="profile-theme-label">Density</span>
+          <button class="btn btn-secondary profile-theme-btn" @click="toggleDensity">
+            {{ isCompact ? '↕️ Comfortable' : '☰ Compact' }}
+          </button>
+        </div>
+
         <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
           <button class="btn btn-danger" style="width:100%" @click="logout">Sign out</button>
         </div>
@@ -116,13 +123,24 @@ const isDark = ref(document.documentElement.getAttribute('data-theme') !== 'ligh
 
 function toggleTheme() {
   isDark.value = !isDark.value
+  // Persist the choice explicitly (including 'dark') so a manual selection is not
+  // forgotten on the next load and overridden by the OS preference. 'dark' has no
+  // dedicated CSS selector — it falls through to the :root defaults, which are dark.
   const theme = isDark.value ? 'dark' : 'light'
-  if (theme === 'dark') {
-    document.documentElement.removeAttribute('data-theme')
-    localStorage.removeItem('theme')
+  document.documentElement.setAttribute('data-theme', theme)
+  localStorage.setItem('theme', theme)
+}
+
+const isCompact = ref(document.documentElement.getAttribute('data-density') === 'compact')
+
+function toggleDensity() {
+  isCompact.value = !isCompact.value
+  if (isCompact.value) {
+    document.documentElement.setAttribute('data-density', 'compact')
+    localStorage.setItem('density', 'compact')
   } else {
-    document.documentElement.setAttribute('data-theme', 'light')
-    localStorage.setItem('theme', 'light')
+    document.documentElement.removeAttribute('data-density')
+    localStorage.removeItem('density')
   }
 }
 

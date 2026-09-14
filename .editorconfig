@@ -1,0 +1,28 @@
+# EditorConfig — keeps indentation/whitespace consistent across editors.
+# https://editorconfig.org  (respected natively by most IDEs; no dependency).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+# Vue SFCs and their template markup use 2-space indentation.
+[*.{vue,html,css,scss,json,yml,yaml}]
+indent_size = 2
+
+# Plain JS HTTP layer / config use 4-space indentation.
+[*.js]
+indent_size = 4
+
+# PHP follows PSR-12 (4 spaces).
+[*.php]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab

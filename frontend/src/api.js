@@ -14,33 +14,58 @@ async function request(path, options = {}) {
         if (refreshed) {
             const access2 = localStorage.getItem('access_token')
             const headers2 = { ...headers, Authorization: `Bearer ${access2}` }
-            return fetch(path, { ...options, headers: headers2 })
+            const res2 = await fetch(path, { ...options, headers: headers2 })
+            if (res2.status === 401) {
+                localStorage.removeItem('access_token')
+                localStorage.removeItem('refresh_token')
+                window.location.href = '/login'
+            }
+            return res2
         }
     }
 
     return res
 }
 
-async function tryRefresh() {
-    const refresh = localStorage.getItem('refresh_token')
-    if (!refresh) return false
+// In-flight refresh guard. Refresh tokens rotate on every /auth/refresh, so two
+// concurrent 401s racing to refresh would each consume the token and invalidate
+// the other — causing a spurious logout. We collapse all concurrent callers onto
+// a single shared refresh promise so the token is rotated exactly once.
+let refreshPromise = null
 
-    const res = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refresh }),
-    })
+function tryRefresh() {
+    if (refreshPromise) return refreshPromise
 
-    if (!res.ok) {
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
-        return false
-    }
+    refreshPromise = (async () => {
+        const refresh = localStorage.getItem('refresh_token')
+        if (!refresh) return false
 
-    const json = await res.json()
-    localStorage.setItem('access_token', json.access_token)
-    if (json.refresh_token) localStorage.setItem('refresh_token', json.refresh_token)
-    return true
+        let res
+        try {
+            res = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refresh }),
+            })
+        } catch {
+            // Network error — keep tokens, let the caller retry later.
+            return false
+        }
+
+        if (!res.ok) {
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('refresh_token')
+            return false
+        }
+
+        const json = await res.json()
+        localStorage.setItem('access_token', json.access_token)
+        if (json.refresh_token) localStorage.setItem('refresh_token', json.refresh_token)
+        return true
+    })()
+
+    refreshPromise.finally(() => { refreshPromise = null })
+    return refreshPromise
 }
 
 export const api = {

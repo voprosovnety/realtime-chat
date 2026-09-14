@@ -2,7 +2,7 @@
   <div class="online-panel">
     <div class="online-panel-header">
       <span class="online-panel-title">Online now</span>
-      <button class="btn-icon" style="padding:4px" @click="$emit('close')">
+      <button class="btn-icon" style="padding:4px" aria-label="Close" title="Close" @click="$emit('close')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>

@@ -21,6 +21,8 @@
       <div class="lightbox-img-wrap">
         <img
           :src="images[index]"
+          alt="Image attachment"
+          decoding="async"
           class="lightbox-img"
           :style="{
             transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,

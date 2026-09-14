@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  workflows:
+    name: Workflow validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate workflow syntax and structure with pinned actionlint
+        run: bash scripts/ci/lint-workflows.sh
+
+  backend:
+    name: Backend tests and Composer audits
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Docker backend suite, forwarding regressions, full and production audits
+        run: node scripts/ci/compose.mjs backend
+      - name: Ensure backend resources are removed
+        if: always()
+        run: node scripts/ci/compose.mjs backend --cleanup
+      - name: Preserve sanitized backend logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-logs
+          path: .playwright-mcp/ci-separation/backend/*.log
+          include-hidden-files: true
+          retention-days: 7
+
+  frontend:
+    name: Frontend build and npm audits
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Clean locked install
+        run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Full dependency audit
+        if: ${{ !cancelled() }}
+        run: npm audit --include=dev
+      - name: Production dependency audit
+        if: ${{ !cancelled() }}
+        run: npm audit --omit=dev
+
+  frontend-regressions:
+    name: Browser regressions (real Mercure and modeled failures)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install locked browser test dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Desktop/mobile, real PostgreSQL/Mercure and modeled refresh regressions
+        working-directory: frontend
+        run: |
+          npm run test:modeled
+          npm run test:browser -- --build
+      - name: Ensure isolated browser resources are removed
+        if: always()
+        run: node scripts/frontend-regressions/run.mjs --cleanup
+
+  compose-smoke:
+    name: PostgreSQL and Mercure (${{ matrix.scenario }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [default, custom, cleanup-failure]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Clean Compose boot and API/SSE smoke
+        if: matrix.scenario != 'cleanup-failure'
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: node scripts/ci/compose.mjs "$SCENARIO"
+      - name: Verify cleanup after an intentional failure
+        if: matrix.scenario == 'cleanup-failure'
+        run: |
+          if node scripts/ci/compose.mjs cleanup-failure; then
+            echo '::error::Expected the injected failure to exit with status 42'
+            exit 1
+          else
+            status=$?
+            test "$status" -eq 42
+          fi
+      - name: Ensure Compose resources are removed
+        if: always()
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: node scripts/ci/compose.mjs "$SCENARIO" --cleanup
+      - name: Preserve sanitized Compose logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compose-${{ matrix.scenario }}-logs
+          path: .playwright-mcp/ci-separation/${{ matrix.scenario }}/*.log
+          include-hidden-files: true
+          retention-days: 7

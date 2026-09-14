@@ -1,0 +1,28 @@
+# Use together with docker-compose.yml; dependencies stay inside the image.
+x-source-volumes: &source-volumes
+  - ./backend/app/src:/var/www/backend/app/src:ro
+  - ./backend/app/config/packages:/var/www/backend/app/config/packages:ro
+  - ./backend/app/config/routes:/var/www/backend/app/config/routes:ro
+  - ./backend/app/config/bundles.php:/var/www/backend/app/config/bundles.php:ro
+  - ./backend/app/config/routes.yaml:/var/www/backend/app/config/routes.yaml:ro
+  - ./backend/app/config/services.yaml:/var/www/backend/app/config/services.yaml:ro
+  - ./backend/app/migrations:/var/www/backend/app/migrations:ro
+  - ./backend/app/templates:/var/www/backend/app/templates:ro
+  - jwt_keys:/var/www/backend/app/config/jwt
+
+services:
+  php:
+    build:
+      target: development
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: 1
+    volumes: *source-volumes
+
+  scheduler:
+    build:
+      target: development
+    environment:
+      APP_ENV: dev
+      APP_DEBUG: 1
+    volumes: *source-volumes

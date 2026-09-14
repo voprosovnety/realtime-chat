@@ -51,6 +51,7 @@ DESIGN.md
 CLAUDE.md
 AGENTS.md
 UX_IMPROVEMENTS.md
+PROJECT_DEFENSE.md
 .claude/
 
 # Playwright MCP output dir (screenshots, console logs, traces, .png/.jpeg/.log).

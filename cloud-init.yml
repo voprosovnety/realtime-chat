@@ -1,142 +1,169 @@
 #cloud-config
-# Timeweb Cloud → Ubuntu 22.04/24.04, регион DE
-# Hostname: chat
-# Запускает весь стек + Caddy с HTTPS через sslip.io (сертификат Let's Encrypt)
-#
-# Если репозиторий приватный — замени URL клонирования на:
-#   https://<YOUR_GITHUB_TOKEN>@github.com/voprosovnety/messenger_prj.git
-
-hostname: chat
-locale: en_US.UTF-8
-timezone: Europe/Berlin
-
-# Публичные ключи для root (безопасно коммитить — это НЕ приватные ключи)
-# Получить свой публичный ключ: ssh-keygen -y -f ~/.ssh/<key>
-ssh_authorized_keys:
-  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBZAo7KlybSdH/vR9nGjFzo222+J+2AvPU4gXLrpAciE danyawalker11@gmail.com
-
-package_update: true
-package_upgrade: false
-
-packages:
-  - git
-  - curl
-  - ca-certificates
-  - gnupg
-  - ufw
-  - openssl
+# Disabled reference template for a fresh Ubuntu 22.04/24.04 server.
+# It is not production-ready and has not been exercised on a fresh server.
+# Before use, provide DNS for PUBLIC_HOSTNAME, replace ADMIN_SSH_PUBLIC_KEY,
+# review every command, and explicitly set ENABLE_PROVISIONING=true.
+# Prefer a cloud-provider SSH-key field; never put a private key or access token here.
 
 write_files:
-  - path: /etc/systemd/system/messenger.service
+  - path: /etc/realtime-chat/provision.env
+    owner: root:root
+    permissions: "0600"
+    content: |
+      ENABLE_PROVISIONING=false
+      ADMIN_SSH_PUBLIC_KEY='ssh-ed25519 <BASE64_PUBLIC_KEY> portfolio-admin@example.invalid'
+      PUBLIC_HOSTNAME='<YOUR_PUBLIC_HOSTNAME>'
+      REPOSITORY_URL='https://github.com/voprosovnety/realtime-chat.git'
+      REPOSITORY_BRANCH='dev'
+
+  - path: /etc/systemd/system/realtime-chat.service
+    owner: root:root
+    permissions: "0644"
     content: |
       [Unit]
-      Description=Messenger
+      Description=RealtimeChat Compose stack
       Requires=docker.service
       After=docker.service network-online.target
+      Wants=network-online.target
+      ConditionPathExists=/opt/realtime-chat/docker-compose.yml
 
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      WorkingDirectory=/opt/messenger
-      ExecStart=/usr/bin/docker compose -f docker-compose.yml up -d
-      ExecStop=/usr/bin/docker compose -f docker-compose.yml down
-      TimeoutStartSec=300
+      WorkingDirectory=/opt/realtime-chat
+      ExecStart=/usr/bin/docker compose up -d --wait --wait-timeout 180
+      ExecStop=/usr/bin/docker compose down
+      TimeoutStartSec=600
+      TimeoutStopSec=120
 
       [Install]
       WantedBy=multi-user.target
 
-  - path: /opt/setup.sh
-    permissions: "0755"
+  - path: /opt/realtime-chat-cloud-init/setup.sh
+    owner: root:root
+    permissions: "0700"
     content: |
-      #!/bin/bash
-      set -eo pipefail
-      log() { echo "[setup] $*"; }
+      #!/usr/bin/env bash
+      set -Eeuo pipefail
 
-      # ── Docker (официальный репозиторий) ──────────────────────
-      log "Installing Docker..."
+      readonly config=/etc/realtime-chat/provision.env
+      log() { printf '[realtime-chat setup] %s\n' "$*"; }
+      fail() { log "ERROR: $*" >&2; exit 1; }
+
+      # This root-owned file is the operator-edited input for this reference template.
+      # shellcheck disable=SC1090
+      source "$config"
+
+      if [[ "${ENABLE_PROVISIONING:-false}" != true ]]; then
+        log "Provisioning is disabled; set ENABLE_PROVISIONING=true only after review."
+        exit 0
+      fi
+
+      for name in ADMIN_SSH_PUBLIC_KEY PUBLIC_HOSTNAME REPOSITORY_URL REPOSITORY_BRANCH; do
+        value=${!name:-}
+        [[ -n "$value" && "$value" != *'<'* && "$value" != *'>'* ]] \
+          || fail "$name is empty or still contains a placeholder"
+      done
+      [[ "$ADMIN_SSH_PUBLIC_KEY" =~ ^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521))[[:space:]]+[A-Za-z0-9+/=]+([[:space:]].*)?$ ]] \
+        || fail "ADMIN_SSH_PUBLIC_KEY is not a supported public-key line"
+      [[ "$PUBLIC_HOSTNAME" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] \
+        || fail "PUBLIC_HOSTNAME is not a valid DNS hostname"
+      [[ "$REPOSITORY_URL" == https://github.com/voprosovnety/realtime-chat.git ]] \
+        || fail "REPOSITORY_URL must be the reviewed token-free HTTPS repository URL"
+      [[ "$REPOSITORY_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] \
+        || fail "REPOSITORY_BRANCH contains unsupported characters"
+
+      export DEBIAN_FRONTEND=noninteractive
+      log "Installing base packages"
+      apt-get update -qq
+      apt-get install -y apt-transport-https ca-certificates curl debian-archive-keyring \
+        debian-keyring git gnupg openssh-client openssl ufw
+
+      key_file=$(mktemp)
+      trap 'rm -f "$key_file"' EXIT
+      printf '%s\n' "$ADMIN_SSH_PUBLIC_KEY" > "$key_file"
+      ssh-keygen -l -f "$key_file" >/dev/null \
+        || fail "ADMIN_SSH_PUBLIC_KEY cannot be parsed by ssh-keygen"
+      install -d -m 0700 /root/.ssh
+      touch /root/.ssh/authorized_keys
+      chmod 0600 /root/.ssh/authorized_keys
+      grep -qxF -- "$ADMIN_SSH_PUBLIC_KEY" /root/.ssh/authorized_keys \
+        || printf '%s\n' "$ADMIN_SSH_PUBLIC_KEY" >> /root/.ssh/authorized_keys
+
+      log "Installing Docker from its official Ubuntu repository"
       install -m 0755 -d /etc/apt/keyrings
       curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
         -o /etc/apt/keyrings/docker.asc
       chmod a+r /etc/apt/keyrings/docker.asc
-      . /etc/os-release
-      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-      https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" \
-        > /etc/apt/sources.list.d/docker.list
+      # shellcheck disable=SC1091
+      source /etc/os-release
+      printf '%s\n' \
+        'Types: deb' \
+        'URIs: https://download.docker.com/linux/ubuntu' \
+        "Suites: ${UBUNTU_CODENAME:-$VERSION_CODENAME}" \
+        'Components: stable' \
+        "Architectures: $(dpkg --print-architecture)" \
+        'Signed-By: /etc/apt/keyrings/docker.asc' \
+        > /etc/apt/sources.list.d/docker.sources
 
-      # ── Caddy (официальный репозиторий) ───────────────────────
-      log "Installing Caddy..."
-      curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-        | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-      curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+      log "Installing Caddy from its official Ubuntu repository"
+      curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key \
+        | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+      curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt \
         > /etc/apt/sources.list.d/caddy-stable.list
+      chmod o+r /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
+        /etc/apt/sources.list.d/caddy-stable.list
 
       apt-get update -qq
-      apt-get install -y \
-        docker-ce docker-ce-cli containerd.io docker-compose-plugin caddy
+      apt-get install -y caddy containerd.io docker-buildx-plugin docker-ce docker-ce-cli \
+        docker-compose-plugin
+      systemctl stop caddy
+      systemctl enable --now docker
 
-      # ── Firewall ───────────────────────────────────────────────
-      log "Configuring UFW..."
-      ufw --force enable
+      [[ ! -e /opt/realtime-chat ]] \
+        || fail "/opt/realtime-chat already exists; refusing to overwrite it"
+      git check-ref-format --branch "$REPOSITORY_BRANCH" >/dev/null \
+        || fail "REPOSITORY_BRANCH is not a valid Git branch name"
+      log "Cloning the explicitly selected branch"
+      git clone --branch "$REPOSITORY_BRANCH" --single-branch --depth 1 \
+        "$REPOSITORY_URL" /opt/realtime-chat
+      [[ "$(git -C /opt/realtime-chat branch --show-current)" == "$REPOSITORY_BRANCH" ]] \
+        || fail "the checked-out branch does not match REPOSITORY_BRANCH"
+
+      umask 077
+      mercure_secret=$(openssl rand -hex 32)
+      postgres_password=$(openssl rand -hex 32)
+      printf '%s\n' \
+        "NGINX_PORT=127.0.0.1:8080" \
+        "MERCURE_PUBLIC_URL=https://${PUBLIC_HOSTNAME}/.well-known/mercure" \
+        "CORS_ORIGINS='https://${PUBLIC_HOSTNAME}'" \
+        "POSTGRES_DB=realtime_chat" \
+        "POSTGRES_USER=realtime_chat" \
+        "POSTGRES_PASSWORD='${postgres_password}'" \
+        "ANTHROPIC_API_KEY=" \
+        "MERCURE_JWT_SECRET=${mercure_secret}" \
+        > /opt/realtime-chat/.env
+      unset mercure_secret postgres_password
+
+      printf '%s {\n    reverse_proxy 127.0.0.1:8080\n}\n' "$PUBLIC_HOSTNAME" \
+        > /etc/caddy/Caddyfile
+      caddy validate --config /etc/caddy/Caddyfile
+      docker compose --project-directory /opt/realtime-chat \
+        -f /opt/realtime-chat/docker-compose.yml config --quiet
+      docker compose --project-directory /opt/realtime-chat \
+        -f /opt/realtime-chat/docker-compose.yml build
+
+      log "Enabling the firewall after validating and installing the admin SSH key"
       ufw allow OpenSSH
       ufw allow 80/tcp
       ufw allow 443/tcp
+      ufw --force enable
 
-      # ── Репозиторий ────────────────────────────────────────────
-      log "Cloning repo..."
-      git clone https://github.com/voprosovnety/messenger_prj.git /opt/messenger
-      git clone https://github.com/voprosovnety/messenger_prj.git /opt/messenger-dev
-
-      # ── Публичный IP → sslip.io домен ─────────────────────────
-      log "Detecting public IP..."
-      IP=$(curl -sf --retry 5 --retry-delay 3 https://api.ipify.org \
-           || curl -sf https://ifconfig.me)
-      DOMAIN="${IP//./-}.sslip.io"
-      log "Domain: https://${DOMAIN}"
-
-      # ── .env prod ─────────────────────────────────────────────
-      SECRET=$(openssl rand -hex 32)
-      printf 'MERCURE_JWT_SECRET=%s\nMERCURE_PUBLIC_URL=https://%s/.well-known/mercure\nNGINX_PORT=127.0.0.1:8080\nAPP_ENV=prod\nANTHROPIC_API_KEY=\n' \
-        "${SECRET}" "${DOMAIN}" > /opt/messenger/.env
-
-      # ── .env dev ──────────────────────────────────────────────
-      DEV_DOMAIN="dev.${DOMAIN}"
-      DEV_SECRET=$(openssl rand -hex 32)
-      printf 'MERCURE_JWT_SECRET=%s\nMERCURE_PUBLIC_URL=https://%s/.well-known/mercure\nNGINX_PORT=127.0.0.1:8081\nAPP_ENV=prod\nANTHROPIC_API_KEY=\n' \
-        "${DEV_SECRET}" "${DEV_DOMAIN}" > /opt/messenger-dev/.env
-
-      # ── Caddyfile (prod + dev) ────────────────────────────────
-      printf '%s {\n    reverse_proxy localhost:8080\n}\n\n%s {\n    reverse_proxy localhost:8081\n}\n' \
-        "${DOMAIN}" "${DEV_DOMAIN}" > /etc/caddy/Caddyfile
+      systemctl daemon-reload
+      systemctl enable --now realtime-chat.service
       systemctl enable caddy
       systemctl restart caddy
-
-      # ── Systemd: автозапуск после ребута ──────────────────────
-      systemctl daemon-reload
-      systemctl enable messenger
-
-      # ── Сборка и запуск (3-5 мин) ─────────────────────────────
-      log "Building images and starting containers..."
-      cd /opt/messenger
-      docker compose -f docker-compose.yml up -d --build
-      log "Waiting for PHP-FPM..."
-      timeout 120 sh -c 'until docker compose -f /opt/messenger/docker-compose.yml exec -T php php bin/console about > /dev/null 2>&1; do sleep 5; done'
-      log "Waiting for PostgreSQL..."
-      timeout 60 sh -c 'until docker compose -f /opt/messenger/docker-compose.yml exec -T postgres pg_isready > /dev/null 2>&1; do sleep 3; done'
-      docker compose -f docker-compose.yml exec -T php php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
-      log "Migrations done."
-
-      log ""
-      log "============================================================"
-      log "  Prod: https://${DOMAIN}"
-      log "  Dev:  https://${DEV_DOMAIN}  (деплоится CI/CD)"
-      log ""
-      log "  Anthropic API key:"
-      log "    nano /opt/messenger/.env && systemctl restart messenger"
-      log "    nano /opt/messenger-dev/.env  (для dev)"
-      log ""
-      log "  Логи: tail -f /var/log/messenger-setup.log"
-      log "  Логи контейнеров: docker compose -f /opt/messenger/docker-compose.yml logs -f"
-      log "============================================================"
+      log "Setup completed for https://${PUBLIC_HOSTNAME}"
 
 runcmd:
-  - bash /opt/setup.sh 2>&1 | tee /var/log/messenger-setup.log
+  - [bash, /opt/realtime-chat-cloud-init/setup.sh]

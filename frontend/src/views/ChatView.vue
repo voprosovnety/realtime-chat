@@ -6,121 +6,22 @@
     @touchcancel.passive="onSwipeTouchCancel"
   >
     <!-- Sidebar with chat list -->
-    <aside class="sidebar" :class="{ 'sidebar-hidden': sidebarHidden }">
-      <div class="sidebar-header">
-        <div class="sidebar-logo">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color:#fff">
-            <path d="M20 2H4C2.9 2 2 2.9 2 4v12c0 1.1.9 2 2 2h6l4 4 4-4h2c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-4 9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-4 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM8 11c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
-          </svg>
-        </div>
-        <span class="sidebar-logo-text">RealtimeChat</span>
-        <button class="online-indicator" :class="{ active: showOnlinePanel }" :title="showOnlinePanel ? 'Close' : 'Online users'" @click="showOnlinePanel = !showOnlinePanel">
-          <span class="online-indicator-dot"></span>{{ onlineUsers.length }} online
-        </button>
-        <button class="btn-icon" :class="{ active: globalSearchOpen }" title="Search all messages" aria-label="Search all messages" @click="showOnlinePanel = false; globalSearchOpen = !globalSearchOpen">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        </button>
-        <button class="btn-icon" title="New chat" aria-label="New chat" @click="openCreate">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-      </div>
-
-      <OnlineUsersPanel
-        v-if="showOnlinePanel"
-        :users="onlineUsers"
-        @open-profile="openUserProfile"
-        @close="showOnlinePanel = false"
-      />
-      <GlobalSearchPanel
-        v-else-if="globalSearchOpen"
-        @close="globalSearchOpen = false"
-        @select="onGlobalSearchSelect"
-      />
-      <div v-else class="sidebar-chats">
-        <!-- AI Assistant entry -->
-        <button
-          class="chat-item"
-          :class="{ active: chatId.value === 'ai' }"
-          type="button"
-          @click="router.push('/chats/ai')"
-        >
-          <div class="ai-chat-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/><circle cx="9" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/></svg>
-          </div>
-          <div class="chat-item-info">
-            <div class="chat-item-top">
-              <span class="chat-item-name">AI Assistant</span>
-            </div>
-            <div class="chat-item-top" style="margin-top:1px">
-              <span class="chat-item-preview">Ask me anything</span>
-            </div>
-          </div>
-        </button>
-
-        <div v-if="sidebarChats.length" class="chats-section-header">
-          <span class="chats-section-label">Conversations</span>
-          <button class="btn-icon chats-section-search-btn" title="Filter chats" @click.stop="sidebarSearchOpen = !sidebarSearchOpen">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </button>
-        </div>
-        <div v-if="sidebarSearchOpen" class="sidebar-search-bar">
-          <input
-            v-model="sidebarSearch"
-            class="sidebar-chat-filter-input"
-            placeholder="Filter chats…"
-            autocomplete="off"
-            ref="sidebarFilterInputRef"
-            @keydown.escape="sidebarSearch = ''; sidebarSearchOpen = false"
-          />
-          <button class="sidebar-search-close" @click="sidebarSearch = ''; sidebarSearchOpen = false">×</button>
-        </div>
-        <template v-for="(c, idx) in filteredSidebarChats" :key="c.id">
-          <div v-if="c.is_pinned && (idx === 0 || !filteredSidebarChats[idx - 1]?.is_pinned)" class="sidebar-section-label">Pinned</div>
-          <div v-if="!c.is_pinned && hasPinnedChats && (idx === 0 || filteredSidebarChats[idx - 1]?.is_pinned)" class="sidebar-section-label">Chats</div>
-          <button
-            class="chat-item"
-            :class="{ active: c.id === chatId.value, unread: (c.unread_count || 0) > 0 }"
-            type="button"
-            @click="router.push(`/chats/${c.id}`)"
-            @contextmenu.prevent="openSidebarMenu($event, c)"
-          >
-          <UserAvatar :username="c.display_name || c.id" :avatarUrl="c.avatar_url || null" size="md" :shape="c.is_group ? 'square' : 'circle'" />
-          <div class="chat-item-info">
-            <div class="chat-item-top">
-              <span class="chat-item-name">{{ c.display_name || c.id }}</span>
-              <svg v-if="isMuted(c.id)" class="muted-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              <svg v-if="c.is_pinned" class="sidebar-pin-icon" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M16 1l-1.5 1.5 1 1-5.5 5.5-2-1L6.5 9.5 9 12H5l-1 1 4 4 1-1v-4l2.5 2.5 1.5-1.5-1-2 5.5-5.5 1 1L19 5.5z"/></svg>
-              <span class="chat-item-time">{{ formatTimeShort(c.last_message?.created_at) }}</span>
-            </div>
-            <div class="chat-item-top" style="margin-top:1px">
-              <span class="chat-item-preview" :class="{ 'chat-item-preview--typing': sidebarTypingMap[c.id] }">
-                <template v-if="sidebarTypingMap[c.id]">
-                  <span v-if="c.is_group" class="sidebar-typing-name">{{ sidebarTypingMap[c.id] }}</span>
-                  <span class="typing-dots typing-dots--sm"><span></span><span></span><span></span></span>
-                </template>
-                <template v-else>
-                  <span v-if="draftMap[c.id]" class="draft-label">Draft: </span>{{ sidebarPreview(c) }}
-                </template>
-              </span>
-              <span v-if="(c.unread_count || 0) > 0" class="unread-badge" :class="{ 'unread-badge--muted': isMuted(c.id) }">{{ c.unread_count }}</span>
-            </div>
-          </div>
-          </button>
-        </template>
-      </div>
-
-      <div class="sidebar-footer">
-        <UserAvatar :username="me?.username || '?'" :avatarUrl="me?.avatar_url" size="md" style="cursor:pointer" @click="router.push('/profile')" />
-        <div class="sidebar-footer-user" style="cursor:pointer" @click="router.push('/profile')">
-          <div class="sidebar-footer-name">{{ me?.username || '…' }}</div>
-          <div class="sidebar-footer-status">{{ me?.email }}</div>
-        </div>
-        <button class="btn-icon" title="Logout" aria-label="Logout" @click="logout">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        </button>
-      </div>
-      <div class="sidebar-version" :title="`RealtimeChat v${appVersion}`">v{{ appVersion }}</div>
-    </aside>
+    <ChatSidebar
+      ref="chatSidebarRef"
+      :chat-id="chatId"
+      :me="me"
+      :app-version="appVersion"
+      :online-users="onlineUsers"
+      v-model:show-online-panel="showOnlinePanel"
+      v-model:global-search-open="globalSearchOpen"
+      :sidebar-hidden="sidebarHidden"
+      @open-create="openCreate"
+      @logout="logout"
+      @navigate-chat="(id) => router.push(`/chats/${id}`)"
+      @navigate-profile="router.push('/profile')"
+      @open-user-profile="openUserProfile"
+      @global-search-select="onGlobalSearchSelect"
+    />
 
     <!-- Mobile: tap-outside backdrop behind the open sidebar -->
     <div
@@ -342,7 +243,7 @@
 
                   <div class="message-bubble-wrap">
                     <!-- Sender name (group chats, others only) -->
-                    <div v-if="isGroup && !isMine(m) && (idx === 0 || g.items[idx-1].sender !== m.sender)" class="message-sender-name" style="cursor:pointer" @click="openUserProfile(m.sender)">
+                    <div v-if="isGroup && !isMine(m) && (idx === 0 || g.items[idx-1].sender !== m.sender)" class="message-sender-name" :style="{ color: senderColor(m.sender), cursor: 'pointer' }" @click="openUserProfile(m.sender)">
                       {{ m.sender }}
                     </div>
 
@@ -400,6 +301,8 @@
                                   v-for="(a, ai) in getAttachments(m).filter(a => a.type === 'image').slice(0, 4)"
                                   :key="ai"
                                   :src="a.url"
+                                  :alt="a.name || 'Image attachment'"
+                                  decoding="async"
                                   class="attachment-grid-img"
                                   @click="openLightbox(a.url)"
                                 />
@@ -436,8 +339,18 @@
                               :class="{ read: peerReadId && idLE(m.id, peerReadId), 'ticks-clickable': isGroup }"
                               @click.stop="isGroup && openReadBy(m.id)"
                             >
-                              <template v-if="peerReadId && idLE(m.id, peerReadId)">✓✓</template>
-                              <template v-else-if="peerDeliveredId && idLE(m.id, peerDeliveredId)">✓</template>
+                              <template v-if="peerReadId && idLE(m.id, peerReadId)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <path d="M2 13l3.5 3.5L13 9"/>
+                                  <path d="M11 16.5L12.5 18 22 8.5"/>
+                                </svg>
+                              </template>
+                              <template v-else-if="peerDeliveredId && idLE(m.id, peerDeliveredId)">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <path d="M2 13l3.5 3.5L13 9"/>
+                                  <path d="M11 16.5L12.5 18 22 8.5"/>
+                                </svg>
+                              </template>
                             </span>
                           </div>
                         </div>
@@ -455,6 +368,12 @@
                       >{{ r.emoji }} {{ r.count }}</button>
                       <button v-if="!isAiChat && !m.deleted_at" class="reaction-add-btn" title="Add reaction" aria-label="Add reaction" @click.stop="openReactionPicker(m.id, $event)">+</button>
                     </div>
+
+                    <!-- DM read receipt timestamp -->
+                    <div
+                      v-if="isMine(m) && !isGroup && peerReadAt && peerReadId && m.id === peerReadId"
+                      class="read-receipt-time"
+                    >Read {{ formatTime(peerReadAt) }}</div>
                   </div>
 
                 </div>
@@ -486,7 +405,7 @@
             <span class="reply-bar-text">
               <strong style="color:var(--accent)">Editing</strong>{{ editingText ? ': ' + editingText : '' }}
             </span>
-            <button class="btn-icon" style="padding:4px" @click="cancelEdit">
+            <button class="btn-icon" style="padding:4px" aria-label="Cancel editing" title="Cancel editing" @click="cancelEdit">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -497,7 +416,7 @@
             <span class="reply-bar-text">
               <strong>{{ replyingTo.sender }}</strong>{{ replyingTo.deleted ? ' · Message deleted' : ': ' + replyPreview(replyingTo) }}
             </span>
-            <button class="btn-icon" style="padding:4px" @click="cancelReply">
+            <button class="btn-icon" style="padding:4px" aria-label="Cancel reply" title="Cancel reply" @click="cancelReply">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -509,7 +428,7 @@
               :key="fi"
               style="position:relative;flex-shrink:0"
             >
-              <img v-if="f.previewUrl" :src="f.previewUrl" style="height:52px;width:52px;object-fit:cover;border-radius:6px;display:block" />
+              <img v-if="f.previewUrl" :src="f.previewUrl" :alt="f.name || 'Selected image preview'" decoding="async" style="height:52px;width:52px;object-fit:cover;border-radius:6px;display:block" />
               <div v-else style="height:52px;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text-2);max-width:120px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent);flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                 {{ f.name }}
@@ -523,6 +442,8 @@
               <button
                 class="btn-icon"
                 style="position:absolute;top:-6px;right:-6px;background:var(--surface-2);border-radius:50%;width:18px;height:18px;padding:0;display:flex;align-items:center;justify-content:center"
+                aria-label="Remove file"
+                title="Remove file"
                 @click="cancelFile(fi)"
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -816,6 +737,7 @@
                   <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
                 </button>
               </div>
+              <div class="composer-pill">
               <textarea
                 ref="composerEl"
                 v-model="input"
@@ -858,6 +780,7 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 <span class="composer-clock-badge">{{ scheduledMessages.length }}</span>
               </button>
+              </div>
               <div v-if="!isAiChat" class="composer-action-wrap send-menu-wrap">
                 <button
                   class="composer-mic composer-action-btn btn-icon"
@@ -927,8 +850,8 @@
       @updated="onGroupUpdated($event)"
       @member-added="onGroupMembersChanged($event)"
       @member-removed="onGroupMembersChanged($event)"
-      @left="sidebarChats = sidebarChats.filter(c => c.id !== chatId); router.push('/')"
-      @deleted="sidebarChats = sidebarChats.filter(c => c.id !== chatId); router.push('/')"
+      @left="chatSidebarRef?.removeSidebarChat(chatId); router.push('/')"
+      @deleted="chatSidebarRef?.removeSidebarChat(chatId); router.push('/')"
       @open-user="openUserProfile($event)"
       @open-media="showGroupProfile = false; showMediaGallery = true"
     />
@@ -937,7 +860,7 @@
     <UserProfileModal
       v-if="profileUsername"
       :username="profileUsername"
-      :sidebarChats="sidebarChats"
+      :sidebarChats="chatSidebarRef?.sidebarChats || []"
       :chatId="isAiChat ? null : chatId"
       @close="profileUsername = null"
       @open-chat="(id) => { profileUsername = null; router.push(`/chats/${id}`) }"
@@ -972,7 +895,7 @@
         </div>
         <div class="modal-body" style="padding:0;max-height:360px;overflow-y:auto">
           <button
-            v-for="c in sidebarChats"
+            v-for="c in (chatSidebarRef?.sidebarChats || [])"
             :key="c.id"
             class="forward-chat-item"
             @click="doForward(c.id)"
@@ -1137,31 +1060,19 @@
     </div>
   </div>
 
-  <!-- Sidebar chat context menu (pin/unpin) -->
-  <Teleport to="body">
-    <template v-if="sidebarItemMenu">
-      <div class="sidebar-ctx-backdrop" @click="closeSidebarMenu" @contextmenu.prevent="closeSidebarMenu"></div>
-      <div
-        ref="sidebarCtxMenuEl"
-        class="sidebar-ctx-menu"
-        :style="{ left: sidebarItemMenu.x + 'px', top: sidebarItemMenu.y + 'px' }"
-      >
-        <button class="sidebar-ctx-item" @click="togglePin(sidebarItemMenu.chat)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <path d="M16 1l-1.5 1.5 1 1-5.5 5.5-2-1L6.5 9.5 9 12H5l-1 1 4 4 1-1v-4l2.5 2.5 1.5-1.5-1-2 5.5-5.5 1 1L19 5.5z"/>
-          </svg>
-          {{ sidebarItemMenu.chat.is_pinned ? 'Unpin' : 'Pin' }}
-        </button>
-      </div>
-    </template>
-  </Teleport>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, ref, nextTick, computed, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, reactive, nextTick, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api'
 import { useFocusTrap } from '../composables/useFocusTrap'
+import { useComposer } from '../composables/useComposer.js'
+import { useVoiceRecorder } from '../composables/useVoiceRecorder.js'
+import { useMessageActions } from '../composables/useMessageActions.js'
+import { useChatSse } from '../composables/useChatSse.js'
+import { useSwipeReply } from '../composables/useSwipeReply.js'
+import ChatSidebar from '../components/ChatSidebar.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import AudioPlayer from '../components/AudioPlayer.vue'
 import GlobalVoicePlayer from '../components/GlobalVoicePlayer.vue'
@@ -1169,10 +1080,8 @@ import ImageLightbox from '../components/ImageLightbox.vue'
 import UserProfileModal from '../components/UserProfileModal.vue'
 import EmojiPicker from '../components/EmojiPicker.vue'
 import GroupProfileModal from '../components/GroupProfileModal.vue'
-import OnlineUsersPanel from '../components/OnlineUsersPanel.vue'
 import PollMessage from '../components/PollMessage.vue'
 import PollForm from '../components/PollForm.vue'
-import GlobalSearchPanel from '../components/GlobalSearchPanel.vue'
 import ScheduledMessagesModal from '../components/ScheduledMessagesModal.vue'
 import SchedulePickerModal from '../components/SchedulePickerModal.vue'
 import LinkPreview from '../components/LinkPreview.vue'
@@ -1187,62 +1096,27 @@ const chatId = computed(() => route.params.chatId)
 // Source of truth is /VERSION at the project root. devops-agent bumps it per commit.
 const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
 
+const SENDER_COLORS = ['#5b8dee','#22c55e','#f59e0b','#e879a7','#36c7d6','#9b6cf0','#ff6b6b','#4ade80']
+function senderColor(username) {
+  if (!username) return SENDER_COLORS[0]
+  let h = 0
+  for (let i = 0; i < username.length; i++) h = (Math.imul(31, h) + username.charCodeAt(i)) | 0
+  return SENDER_COLORS[Math.abs(h) % SENDER_COLORS.length]
+}
+
+const chatSidebarRef = ref(null)
+
 const me = ref(null)
 const chat = ref(null)
 const participants = ref([])
-const sidebarChats = ref([])
 
-// ── Mute ─────────────────────────────────────────────────────────────────────
-const mutedChats = ref(new Set(JSON.parse(localStorage.getItem('mutedChats') || '[]')))
-
-function isMuted(id) { return mutedChats.value.has(id) }
-
-function toggleMute(id) {
-  const s = new Set(mutedChats.value)
-  if (s.has(id)) s.delete(id)
-  else s.add(id)
-  mutedChats.value = s
-  localStorage.setItem('mutedChats', JSON.stringify([...s]))
-}
-
-// ─── Sidebar pin ──────────────────────────────────────────────────
-function openSidebarMenu(e, chat) {
-  e.preventDefault()
-  sidebarItemMenu.value = { chat, x: e.clientX, y: e.clientY }
-}
-
-function closeSidebarMenu() {
-  sidebarItemMenu.value = null
-}
-
-async function togglePin(c) {
-  try {
-    const result = await api.toggleSidebarPin(c.id)
-    const idx = sidebarChats.value.findIndex(sc => sc.id === c.id)
-    if (idx !== -1) {
-      sidebarChats.value[idx] = { ...sidebarChats.value[idx], is_pinned: result.is_pinned }
-    }
-  } catch (e) {
-    showToast(e.message || 'Failed to pin chat', 'error')
-  } finally {
-    closeSidebarMenu()
-  }
-}
-
-// ── Tab title ─────────────────────────────────────────────────────────────────
-const totalUnread = computed(() =>
-  sidebarChats.value.reduce((sum, c) => {
-    if (mutedChats.value.has(c.id)) return sum
-    return sum + (c.unread_count || 0)
-  }, 0)
-)
-
-watch(totalUnread, n => {
-  document.title = n > 0 ? `(${n}) RealtimeChat` : 'RealtimeChat'
-}, { immediate: true })
+// ── Mute — delegate to sidebar ────────────────────────────────────────────────
+function isMuted(id) { return chatSidebarRef.value?.isMuted(id) ?? false }
+function toggleMute(id) { chatSidebarRef.value?.toggleMute(id) }
 
 const peerDeliveredId = ref(null)
 const peerReadId = ref(null)
+const peerReadAt = ref(null)
 
 const messages = ref([])
 const nextCursor = ref(null)
@@ -1251,10 +1125,10 @@ const loadingMore = ref(false)
 const chatLoading = ref(false)
 const showScrollBtn = ref(false)
 const unreadWhileScrolled = ref(0)
-const input = ref('')
+// ── ChatView-owned shared refs (passed into composables) ──────────
 const editingId = ref(null)
 const editingText = ref('')
-const replyingTo = ref(null)
+const uploading = ref(false)
 const highlightedId = ref(null)
 let highlightTimer = null
 const newMessageIds = ref(new Set())
@@ -1271,33 +1145,28 @@ const userSuggestions = ref([])
 const showSuggestions = ref(false)
 let createSearchDebounce = null
 
-const typingUser = ref('')
-let typingTimeout = null
-const sidebarTypingMap = ref({})
-const sidebarTypingTimers = {}
-let typingDebounce = null
+const typingUsersMap = reactive({})  // username → true (reactive, current chat)
+const typingUserTimers = {}          // username → timeoutId (non-reactive)
+const typingUser = computed(() => {
+  const names = Object.keys(typingUsersMap)
+  if (!names.length) return ''
+  if (names.length === 1) return names[0]
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names[0]}, ${names[1]} and ${names.length - 2} more`
+})
 
 const listEl = ref(null)
 const composerEl = ref(null)
 const fileInputEl = ref(null)
-const mentionOpen = ref(false)
-const mentionQuery = ref('')
-const mentionIdx = ref(0)
-const mentionCursorStart = ref(0)
 const emojiButtonEl = ref(null)
-const emojiPickerPos = ref({ bottom: 70, left: '50%', transform: 'translateX(-50%)' })
-const pendingFiles = ref([]) // [{ url, type, name, previewUrl }]
-const uploading = ref(false)
-const dragging = ref(false)
-let dragCounter = 0
+const attachBtnEl = ref(null)
+const sendBtnEl = ref(null)
 
 const lightboxOpen = ref(false)
 const lightboxIndex = ref(0)
 
 const profileUsername = ref(null)
 const sidebarHidden = ref(window.innerWidth < 640)
-const composerError = ref('')
-const recording = ref(false)
 const aiMessages = ref([])
 const aiLoading = ref(false)
 
@@ -1309,19 +1178,8 @@ const showOnlinePanel = ref(false)
 const globalSearchOpen = ref(false)
 const showMediaGallery = ref(false)
 const onlineUsers = ref([])
-const draftMap = ref({})
-const showEmojiPicker = ref(false)
-const showAttachMenu = ref(false)
-const attachBtnEl = ref(null)
-const attachMenuPos = ref({ bottom: 0, left: 0 })
-const showPollForm = ref(false)
 
 const scheduledMessages = ref([])
-const showScheduledList = ref(false)
-const showSchedulePicker = ref(false)
-const showSendMenu = ref(false)
-const sendBtnEl = ref(null)
-const sendMenuPos = ref({ bottom: 0, right: 0 })
 
 const searchOpen = ref(false)
 const searchQuery = ref('')
@@ -1330,15 +1188,6 @@ const searchLoading = ref(false)
 const searchInputEl = ref(null)
 const searchIdx = ref(-1)
 let searchDebounce = null
-
-// ─── Sidebar chat filter ──────────────────────────────────────────
-const sidebarSearch = ref('')
-const sidebarSearchOpen = ref(false)
-const sidebarFilterInputRef = ref(null)
-
-// ─── Sidebar item context menu (pin/unpin) ────────────────────────
-const sidebarItemMenu = ref(null) // { chat, x, y }
-const sidebarCtxMenuEl = ref(null)
 
 // ─── Modal element refs (for focus trap) ─────────────────────────
 const createModalEl = ref(null)
@@ -1357,15 +1206,6 @@ function showToast(text, type = 'info', duration = 2200) {
   toastType.value = type
   toastTimer = setTimeout(() => { toastMsg.value = null }, duration)
 }
-
-// ─── SSE status ───────────────────────────────────────────────────
-const sseStatus = ref('connected')
-
-// ─── Composer link preview ────────────────────────────────────────
-const composerLinkPreview = ref(null)
-const composerLinkPreviewDismissed = ref(false)
-const composerLinkPreviewLoading = ref(false)
-let linkPreviewDebounce = null
 
 // ─── Notification sound ───────────────────────────────────────────
 function playNotifSound() {
@@ -1387,22 +1227,7 @@ function playNotifSound() {
 // ─── Keyboard shortcuts modal ─────────────────────────────────────
 const showKeyboardShortcutsModal = ref(false)
 
-// ─── Poll results modal ───────────────────────────────────────────
-const pollResultsMsg = ref(null)
-
-function openPollResults(msg) {
-  pollResultsMsg.value = msg
-}
-
-// ─── Read receipt details ─────────────────────────────────────────
-const readByMsgId = ref(null)
-const readByList = ref([])
-const readByLoading = ref(false)
-
-// ─── Voice waveform ───────────────────────────────────────────────
-const waveformBars = ref([])
-let waveformRafId = null
-let waveformAudioCtx = null
+// ─── Read receipt details — owned by useMessageActions ───────────
 
 // ─── Audio player refs (auto-play next voice message) ─────────────
 const audioPlayerRefs = {}
@@ -1444,8 +1269,18 @@ function sortReactions(arr) {
 }
 
 // ─── renderContent (linkify + markdown-lite) ──────────────────────
+// Memoization cache: renderContent is called from the template for every message
+// on every re-render. Without caching, each render re-runs DOM escaping + 6 regex
+// passes per visible message — wasteful in long chats. Keyed by raw content; the
+// output is a pure function of the input, so the cache is always valid. Capped to
+// avoid unbounded growth across a long session.
+const _renderCache = new Map()
+const _RENDER_CACHE_MAX = 1000
+
 function renderContent(text) {
   if (!text) return ''
+  const cached = _renderCache.get(text)
+  if (cached !== undefined) return cached
   // Sanitize via DOM textContent→innerHTML to get HTML-escaped string
   const div = document.createElement('div')
   div.textContent = text
@@ -1460,48 +1295,10 @@ function renderContent(text) {
   safe = safe.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
   // @mention highlight
   safe = safe.replace(/@([a-zA-Z0-9_]+)/g, '<span class="mention-highlight">@$1</span>')
+  if (_renderCache.size >= _RENDER_CACHE_MAX) _renderCache.delete(_renderCache.keys().next().value)
+  _renderCache.set(text, safe)
   return safe
 }
-
-function closeMentionPopup() {
-  mentionOpen.value = false
-  mentionQuery.value = ''
-  mentionIdx.value = 0
-}
-
-function selectMention(username) {
-  const el = composerEl.value
-  if (!el) return
-  const before = input.value.slice(0, mentionCursorStart.value)
-  const after = input.value.slice(el.selectionStart)
-  input.value = before + '@' + username + ' ' + after
-  closeMentionPopup()
-  nextTick(() => {
-    const pos = (before + '@' + username + ' ').length
-    el.setSelectionRange(pos, pos)
-    el.focus()
-  })
-}
-
-const filteredSidebarChats = computed(() => {
-  const sorted = [...sidebarChats.value].sort((a, b) => {
-    if (a.is_pinned === b.is_pinned) return 0
-    return a.is_pinned ? -1 : 1
-  })
-  if (!sidebarSearch.value.trim()) return sorted
-  const q = sidebarSearch.value.toLowerCase()
-  return sorted.filter(c => (c.title || c.display_name || '').toLowerCase().includes(q))
-})
-
-const hasPinnedChats = computed(() => filteredSidebarChats.value.some(c => c.is_pinned))
-
-const filteredMentions = computed(() => {
-  if (!isGroup.value || !mentionOpen.value) return []
-  const q = mentionQuery.value.toLowerCase()
-  return participants.value
-    .filter(p => !p.is_me && p.username.toLowerCase().startsWith(q))
-    .slice(0, 6)
-})
 
 // ─── Unread divider ───────────────────────────────────────────────
 const unreadDividerBeforeId = ref(null)
@@ -1513,7 +1310,7 @@ function computeUnreadDivider() {
     m.sender !== me.value.username &&
     m.deleted_at == null
   )
-  const chatData = sidebarChats.value.find(c => c.id == chatId.value) || chat.value
+  const chatData = (chatSidebarRef.value?.sidebarChats || []).find(c => c.id == chatId.value) || chat.value
   const count = chatData?.unread_count || 0
   if (count > 0 && unread.length > 0) {
     const startIdx = unread.length - count
@@ -1563,121 +1360,24 @@ function onPaste(e) {
 const reactionPickerMsgId = ref(null)
 const reactionPickerPos = ref({ x: 0, y: 0 })
 
-// ─── Desktop right-click context menu ─────────────────────────────
-const desktopMenu = ref(null)   // { msg, x, y, anchorEvent } or null
-const desktopMenuEl = ref(null)
-const desktopMenuStyle = ref({})
 const showFullReactionPicker = ref(false)
 
-const forwardingMsg = ref(null)
-const showForwardModal = ref(false)
-
-// ─── Bulk selection ───────────────────────────────────────────────
-const selectionMode = ref(false)
-const selectedMsgIds = ref(new Set())
-const bulkDeleteConfirming = ref(false)
-
-function enterSelectionMode(msgId) {
-  selectionMode.value = true
-  selectedMsgIds.value = new Set([msgId])
-}
-
-function exitSelectionMode() {
-  selectionMode.value = false
-  selectedMsgIds.value = new Set()
-  bulkDeleteConfirming.value = false
-}
-
-function toggleMsgSelection(msgId) {
-  if (!selectionMode.value) return
-  const s = new Set(selectedMsgIds.value)
-  if (s.has(msgId)) s.delete(msgId)
-  else s.add(msgId)
-  selectedMsgIds.value = s
-  bulkDeleteConfirming.value = false  // reset confirm state when selection changes
-  if (s.size === 0) exitSelectionMode()
-}
-
-function onMsgShiftClick(msgId) {
-  if (!selectionMode.value) enterSelectionMode(msgId)
-  else toggleMsgSelection(msgId)
-}
-
-function onMsgClick(e, msgId) {
-  if (!selectionMode.value) return
-  e.stopPropagation()
-  toggleMsgSelection(msgId)
-}
-
-const canDeleteSelected = computed(() =>
-  selectedMsgIds.value.size > 0 &&
-  [...selectedMsgIds.value].every(id => {
-    const m = messages.value.find(x => x.id === id)
-    return m && isMine(m) && !m.deleted_at
-  })
-)
-
-async function bulkDelete() {
-  if (!bulkDeleteConfirming.value) {
-    bulkDeleteConfirming.value = true
-    return
-  }
-  // Second click: confirmed — execute the deletion
-  bulkDeleteConfirming.value = false
-  const ids = [...selectedMsgIds.value]
-  const deletable = ids.filter(id => {
-    const m = messages.value.find(x => x.id === id)
-    return m && isMine(m) && !m.deleted_at
-  })
-  if (!deletable.length) return
-  for (const id of deletable) {
-    try { await api.deleteMessage(chatId.value, id) } catch {}
-  }
-  showToast(`${deletable.length} message${deletable.length > 1 ? 's' : ''} deleted`, 'success')
-  exitSelectionMode()
-}
-
-function bulkForward() {
-  if (!selectedMsgIds.value.size) return
-  const id = [...selectedMsgIds.value][0]
-  const m = messages.value.find(x => x.id === id)
-  if (!m) return
-  forwardingMsg.value = m
-  showForwardModal.value = true
-  exitSelectionMode()
-}
+// forwardingMsg, showForwardModal, selectionMode, selectedMsgIds, bulkDeleteConfirming,
+// enterSelectionMode, exitSelectionMode, toggleMsgSelection, onMsgShiftClick, onMsgClick,
+// canDeleteSelected, bulkDelete, bulkForward — all owned by useMessageActions
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥', '👎']
 
-// ─── Mobile message interactions ──────────────────────────────────
-const swipeMsgId = ref(null)    // message id whose bubble is being swiped
-const msgSwipeX = ref(0)        // current X translate offset (px)
-const msgSwipeDone = ref(false) // true during spring-back transition
-const mobileMenu = ref(null)    // { msg, rawX, rawY, x, y, adjusted } or null
-const mobileMenuEl = ref(null)  // ref to the rendered menu DOM element
-
-let _msgSwipeId = null          // non-reactive; tracks swipe in touchmove handler
-let _msgSwipeStartX = 0
-let _msgSwipeStartY = 0
-let _msgSwipeDecided = null     // null | 'h' | 'v'
-let _msgLongPressTimer = null
-let _msgLongPressTriggered = false
-const recordingTime = ref(0)
-let mediaRecorder = null
-let recordingChunks = []
-let recordingStream = null
-let recordingTimer = null
-let sendLongPressTimer = null
-let sendLongPressTriggered = false
-let es = null
-let chatSseStopped = false
-let chatSseDelay = 1000
-let chatSseTimer = null
-let chatSseGen = 0
 let pingInterval = null
 let onlineUsersInterval = null
-let pinnedNavLock = false
-let pinnedNavLockTimer = null
+let _suppressLoadMoreTimer = null
+let _suppressLoadMore = false
+// True while the view should stay pinned to the newest message. Set when we
+// programmatically scroll to bottom (chat enter / send); cleared in onScroll
+// once the user scrolls up. While true, async media (images, link-preview
+// thumbnails) finishing load re-pins to bottom so late-loading content can't
+// push the latest messages out of view ("chat jumps up a second after enter").
+let _stickBottom = false
 
 // ─── computed ────────────────────────────────────────────────────
 const isAiChat = computed(() => chatId.value === 'ai')
@@ -1698,7 +1398,6 @@ function isUserOnline(user) {
 
 const isPeerOnline = computed(() => peerUser.value ? isUserOnline(peerUser.value) : false)
 const onlineParticipantsCount = computed(() => participants.value.filter(p => isUserOnline(p)).length)
-const canPin = computed(() => !isAiChat.value && (isOwner.value || !isGroup.value))
 const currentPinned = computed(() => pinnedMessages.value[pinnedIndex.value] || null)
 
 const grouped = computed(() => {
@@ -1795,50 +1494,6 @@ function formatRelative(iso) {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
-function saveDraft(id, text) {
-  if (!id || id === 'ai') return
-  if (text) {
-    localStorage.setItem(`draft:${id}`, text)
-    draftMap.value = { ...draftMap.value, [id]: text }
-  } else {
-    localStorage.removeItem(`draft:${id}`)
-    const m = { ...draftMap.value }
-    delete m[id]
-    draftMap.value = m
-  }
-}
-
-function loadDraft(id) {
-  if (!id || id === 'ai') return ''
-  return localStorage.getItem(`draft:${id}`) || ''
-}
-
-function sidebarPreview(c) {
-  const draft = draftMap.value[c.id]
-  if (draft) return draft
-  const lm = c.last_message
-  if (!lm) return 'No messages'
-  const isMe = lm.sender_username === me.value?.username
-  const prefix = c.is_group
-    ? (isMe ? 'You: ' : (lm.sender_username ? lm.sender_username + ': ' : ''))
-    : (isMe ? 'You: ' : '')
-  if (lm.type === 'poll') return prefix + '📊 Poll'
-  if (lm.attachments?.length) {
-    const imgs = lm.attachments.filter(a => /\.(jpe?g|png|gif|webp)(\?|$)/i.test(a.url || ''))
-    if (imgs.length > 1) return prefix + imgs.length + ' photos'
-    if (imgs.length === 1) return prefix + 'Photo'
-    const vids = lm.attachments.filter(a => /\.(mp4|webm|mov|avi)(\?|$)/i.test(a.url || ''))
-    if (vids.length) return prefix + 'Video'
-    return prefix + 'File'
-  }
-  if (lm.content) return prefix + lm.content
-  if (lm.attachment_type === 'audio') return prefix + 'Voice message'
-  if (lm.attachment_type === 'image') return prefix + 'Photo'
-  if (lm.attachment_type === 'video') return prefix + 'Video'
-  if (lm.attachment_url) return prefix + 'File'
-  return prefix || 'No messages'
-}
-
 // ─── scrolling ────────────────────────────────────────────────────
 function isNearBottom(thresholdPx = 100) {
   const el = listEl.value
@@ -1849,11 +1504,31 @@ function isNearBottom(thresholdPx = 100) {
 async function scrollToBottom() {
   await nextTick()
   if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight
+  _stickBottom = true
+  // Prevent onScroll from triggering loadMore() immediately after a programmatic
+  // scroll-to-bottom: if messages barely fill the viewport, scrollTop ends up
+  // near 0 (which is < 120) and loadMore fires, prepending older messages and
+  // jumping the view away from the newest content.
+  _suppressLoadMore = true
+  clearTimeout(_suppressLoadMoreTimer)
+  _suppressLoadMoreTimer = setTimeout(() => { _suppressLoadMore = false }, 600)
 }
 
 function scrollToBottomFab() {
   scrollToBottom()
   unreadWhileScrolled.value = 0
+}
+
+// Re-pin to bottom when descendant media finishes loading and grows the
+// content. Registered in the capture phase on listEl because these events do
+// not bubble: <img> fires `load`; <video> never fires `load` and instead
+// reports its size via `loadedmetadata`. Only fires while _stickBottom is true
+// and we are not prepending older history.
+function onMediaLoadPin(e) {
+  const tag = e.target && e.target.tagName
+  if (tag !== 'IMG' && tag !== 'VIDEO') return
+  if (!_stickBottom || loadingMore.value) return
+  if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight
 }
 
 // ─── online users ─────────────────────────────────────────────────
@@ -1909,73 +1584,6 @@ async function loadScheduled() {
   } catch { scheduledMessages.value = [] }
 }
 
-async function openSchedulePicker() {
-  if (isAiChat.value) return
-  const text = input.value.trim()
-  const atts = pendingFiles.value.slice()
-  if (!text && !atts.length) {
-    composerError.value = 'Type a message first to schedule it'
-    return
-  }
-  composerError.value = ''
-  showSchedulePicker.value = true
-}
-
-function onSendTouchStart() {
-  sendLongPressTriggered = false
-  sendLongPressTimer = setTimeout(() => {
-    sendLongPressTriggered = true
-    if (sendBtnEl.value) {
-      const rect = sendBtnEl.value.getBoundingClientRect()
-      sendMenuPos.value = { bottom: window.innerHeight - rect.top + 8, right: window.innerWidth - rect.right }
-    }
-    showSendMenu.value = true
-  }, 500)
-}
-
-function onSendTouchEnd(e) {
-  clearTimeout(sendLongPressTimer)
-  if (sendLongPressTriggered) {
-    e.preventDefault()
-    sendLongPressTriggered = false
-  }
-}
-
-async function onSchedulePicked(isoTime) {
-  showSchedulePicker.value = false
-  const text = input.value.trim()
-  const atts = pendingFiles.value.slice()
-  const replyId = replyingTo.value?.id ?? null
-  try {
-    await api.createScheduledMessage(chatId.value, {
-      content: text,
-      scheduledAt: isoTime,
-      replyToId: replyId,
-      attachments: atts,
-    })
-    input.value = ''
-    replyingTo.value = null
-    pendingFiles.value = []
-    await loadScheduled()
-  } catch (e) {
-    composerError.value = e.message
-  }
-}
-
-function onScheduledUpdated(updated) {
-  const i = scheduledMessages.value.findIndex(s => s.id === updated.id)
-  if (i !== -1) {
-    scheduledMessages.value = scheduledMessages.value
-      .map((s, idx) => idx === i ? updated : s)
-      .sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))
-  }
-}
-
-function onScheduledDeleted(id) {
-  scheduledMessages.value = scheduledMessages.value.filter(s => s.id !== id)
-  if (!scheduledMessages.value.length) showScheduledList.value = false
-}
-
 async function loadMore() {
   if (loadingMore.value || !hasMore.value || !nextCursor.value) return
   loadingMore.value = true
@@ -1996,28 +1604,24 @@ async function loadMore() {
 }
 
 function onScroll() {
-  if (listEl.value && listEl.value.scrollTop < 120 && hasMore.value && !loadingMore.value) {
+  if (!_suppressLoadMore && listEl.value && listEl.value.scrollTop < 120 && hasMore.value && !loadingMore.value) {
     loadMore()
   }
   updatePinnedIndexFromScroll()
   if (listEl.value) {
     const distFromBottom = listEl.value.scrollHeight - listEl.value.scrollTop - listEl.value.clientHeight
     showScrollBtn.value = distFromBottom > 200
+    _stickBottom = distFromBottom <= 200
     if (distFromBottom <= 200) unreadWhileScrolled.value = 0
   }
 }
 
-async function loadSidebarChats() {
-  try {
-    const data = await api.listChats()
-    sidebarChats.value = data.items || []
-  } catch {}
+function loadSidebarChats() {
+  return chatSidebarRef.value?.loadSidebarChats()
 }
 
 function clearCurrentChatUnread() {
-  const idx = sidebarChats.value.findIndex(c => c.id === chatId.value)
-  if (idx === -1) return
-  sidebarChats.value = sidebarChats.value.map((c, i) => i === idx ? { ...c, unread_count: 0 } : c)
+  chatSidebarRef.value?.clearCurrentChatUnread(chatId.value)
 }
 
 // ─── receipts ─────────────────────────────────────────────────────
@@ -2028,316 +1632,241 @@ async function markReadIfPossible() {
   await api.markRead(chatId.value, last.id).catch(() => {})
 }
 
-// ─── typing ───────────────────────────────────────────────────────
-function onTyping() {
-  // @mention detection — use DOM el.value to avoid reactive/cursor timing issues
-  if (isGroup.value && composerEl.value) {
-    const el = composerEl.value
-    const pos = el.selectionStart
-    const textBefore = el.value.slice(0, pos)
-    const mentionMatch = textBefore.match(/@(\w*)$/)
-    if (mentionMatch) {
-      mentionCursorStart.value = textBefore.lastIndexOf('@')
-      mentionQuery.value = mentionMatch[1]
-      mentionOpen.value = true
-      mentionIdx.value = 0
-    } else {
-      closeMentionPopup()
-    }
-  }
-  // Auto-resize textarea — must run after Vue's v-model reconcile pass
-  nextTick(() => {
-    const el = composerEl.value
-    if (el) {
-      el.style.height = 'auto'
-      el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-    }
-  })
-  clearTimeout(typingDebounce)
-  typingDebounce = setTimeout(() => {
-    api.sendTyping(chatId.value).catch(() => {})
-  }, 400)
-  // Link preview debounce
-  clearTimeout(linkPreviewDebounce)
-  if (!composerLinkPreviewDismissed.value) {
-    const urlMatch = input.value.match(/https?:\/\/[^\s]+/)
-    if (urlMatch) {
-      composerLinkPreviewLoading.value = true
-      composerLinkPreview.value = null
-      linkPreviewDebounce = setTimeout(async () => {
-        try {
-          composerLinkPreview.value = await api.getLinkPreview(urlMatch[0])
-        } catch { composerLinkPreview.value = null }
-        finally { composerLinkPreviewLoading.value = false }
-      }, 800)
-    } else {
-      composerLinkPreview.value = null
-      composerLinkPreviewLoading.value = false
-    }
-  }
-}
+// ─── markDelivered wrapper (passed into useChatSse) ──────────────
+const markDelivered = (cid, mid) => api.markDelivered(cid, mid).catch(() => {})
 
-// ─── SSE ─────────────────────────────────────────────────────────
-function stopChatSse() {
-  chatSseStopped = true
-  chatSseGen++
-  clearTimeout(chatSseTimer)
-  if (es) { es.close(); es = null }
-}
+// ─── late-binding holder for cancelEdit ──────────────────────────
+// useComposer needs cancelEdit but useMessageActions provides it later.
+let _cancelEdit = () => {}
 
-async function connectSse() {
-  chatSseStopped = false
-  chatSseDelay = 1000
-  const gen = ++chatSseGen
+// ─── Composer composable ──────────────────────────────────────────
+const {
+  input,
+  composerError,
+  replyingTo,
+  pendingFiles,
+  dragging,
+  mentionOpen,
+  mentionQuery,
+  mentionIdx,
+  mentionCursorStart,
+  filteredMentions,
+  showEmojiPicker,
+  emojiPickerPos,
+  showAttachMenu,
+  attachMenuPos,
+  showSendMenu,
+  sendMenuPos,
+  showPollForm,
+  showScheduledList,
+  showSchedulePicker,
+  composerLinkPreview,
+  composerLinkPreviewDismissed,
+  composerLinkPreviewLoading,
+  send: _composerSend,
+  onTyping,
+  onKeydown: _composerOnKeydown,
+  selectMention,
+  closeMentionPopup,
+  onEmojiSelect: _composerOnEmojiSelect,
+  toggleEmojiPicker: _composerToggleEmojiPicker,
+  toggleAttachMenu,
+  openSendMenu,
+  onSendTouchStart,
+  onSendTouchEnd,
+  openSchedulePicker,
+  onSchedulePicked,
+  onScheduledUpdated,
+  onScheduledDeleted,
+  onFileSelect,
+  cancelFile,
+  processFile,
+  onDragEnter,
+  onDragLeave,
+  onDrop,
+  startReply,
+  cancelReply,
+  submitPoll,
+  saveDraft,
+  loadDraft,
+  linkPreviewDebounce,
+  dragCounterReset,
+} = useComposer({
+  chatId,
+  me,
+  isAiChat,
+  isGroup,
+  messages,
+  participants,
+  editingId,
+  editingText,
+  cancelEdit: () => _cancelEdit(),
+  composerEl,
+  fileInputEl,
+  emojiButtonEl,
+  attachBtnEl,
+  sendBtnEl,
+  listEl,
+  isNearBottom,
+  scrollToBottom,
+  showToast,
+  aiMessages,
+  aiLoading,
+  scheduledMessages,
+  loadScheduled,
+  uploading,
+})
 
-  const attempt = async () => {
-    if (chatSseStopped || chatSseGen !== gen) return
-    try {
-      const sub = await api.subscribeAllChats()
-      if (chatSseStopped || chatSseGen !== gen) return
-      const params = new URLSearchParams()
-      for (const t of sub.topics || []) params.append('topic', t)
-      const source = new EventSource(`/.well-known/mercure?${params.toString()}`, { withCredentials: true })
-      es = source
+// ─── Voice recorder (composable) ──────────────────────────────────
+const { recording, recordingTime, waveformBars, startRecording, cancelRecording, sendRecording, fmtRecTime } = useVoiceRecorder({ isAiChat, chatId, isNearBottom, scrollToBottom, showToast, uploading, composerError })
 
-      source.onopen = () => { chatSseDelay = 1000; sseStatus.value = 'connected' }
-      source.onmessage = async (evt) => {
-        const payload = JSON.parse(evt.data)
-        const d = payload.data
+// ─── Message actions (composable) — MUST be before useChatSse ────
+const {
+  deletingMsgId,
+  readByMsgId,
+  readByList,
+  readByLoading,
+  forwardingMsg,
+  showForwardModal,
+  selectionMode,
+  selectedMsgIds,
+  bulkDeleteConfirming,
+  canDeleteSelected,
+  pollResultsMsg,
+  canPin,
+  removeMessage,
+  startEdit,
+  saveEdit,
+  cancelEdit,
+  openReadBy,
+  doPin,
+  doToggleReaction,
+  handleReactionClick,
+  isMyReaction,
+  doVotePoll,
+  doRetractPollVote,
+  openPollResults,
+  startForward,
+  doForward: _doForward,
+  enterSelectionMode,
+  exitSelectionMode,
+  toggleMsgSelection,
+  onMsgShiftClick,
+  onMsgClick,
+  bulkDelete,
+  bulkForward,
+  copyMessageText: _copyMessageText,
+  pinnedPreview,
+  stablePinnedIndex,
+  lockPinnedNav,
+  clickPinnedBar: _clickPinnedBar,
+  navigatePin: _navigatePin,
+  updatePinnedIndexFromScroll: _updatePinnedIndexFromScroll,
+} = useMessageActions({
+  chatId,
+  messages,
+  me,
+  pinnedMessages,
+  pinnedIndex,
+  currentPinned,
+  editingId,
+  composerEl,
+  input,
+  editingText,
+  showToast,
+  isGroup,
+  isOwner,
+  isAiChat,
+  composerError,
+})
+// Late-bind cancelEdit so useComposer's closure picks it up
+_cancelEdit = cancelEdit
 
-        if (payload.type === 'chat.created') {
-          stopChatSse()
-          await loadSidebarChats()
-          await connectSse()
-          return
-        }
+// Wrappers that supply ChatView-owned locals to composable functions
+function clickPinnedBar() { return _clickPinnedBar(jumpToMessage) }
+function navigatePin(delta) { return _navigatePin(delta, jumpToMessage) }
+function updatePinnedIndexFromScroll() { return _updatePinnedIndexFromScroll(listEl) }
+function doForward(targetChatId) { return _doForward(targetChatId, router) }
+function copyMessageText(m, closeMobileMenu) { return _copyMessageText(m, closeMobileMenu) }
 
-        if (payload.type === 'chat.deleted') {
-          const deletedId = d?.chat_id
-          if (deletedId) {
-            sidebarChats.value = sidebarChats.value.filter(c => c.id !== deletedId)
-            if (chatId.value === deletedId) router.push('/')
-          }
-          return
-        }
+// ─── SSE (composable) ─────────────────────────────────────────────
+const { sseStatus, connectSse, stopChatSse } = useChatSse({
+  chatId,
+  me,
+  messages,
+  chatSidebarRef,
+  participants,
+  chat,
+  pinnedMessages,
+  pinnedIndex,
+  peerDeliveredId,
+  peerReadId,
+  newMessageIds,
+  showScrollBtn,
+  unreadWhileScrolled,
+  typingUsersMap,
+  typingUserTimers,
+  peerReadAt,
+  currentPinned,
+  scheduledMessages,
+  isNearBottom,
+  scrollToBottom,
+  markReadIfPossible,
+  markDelivered,
+  loadScheduled,
+  isMuted,
+  playNotifSound,
+  sortReactions,
+  stablePinnedIndex,
+  router,
+})
 
-        if (payload.type === 'chat.updated') {
-          const updatedId = d?.chat_id
-          const newTitle = d?.title
-          if (updatedId && newTitle) {
-            const idx = sidebarChats.value.findIndex(c => c.id === updatedId)
-            if (idx !== -1) sidebarChats.value = sidebarChats.value.map((c, i) => i === idx ? { ...c, display_name: newTitle, title: newTitle } : c)
-            if (chatId.value === updatedId) chat.value = { ...chat.value, title: newTitle, display_name: newTitle }
-          }
-          return
-        }
-
-        if (payload.type === 'chat.member_removed') {
-          if (d?.chat_id === chatId.value && d?.user_id) {
-            participants.value = participants.value.filter(p => p.id !== d.user_id)
-          }
-          return
-        }
-
-        // Typing indicator — handled before per-chat filter so all chats get it
-        if (payload.type === 'user.typing') {
-          const tChatId = d.chatId ?? d.chat_id
-          if (tChatId && d.username !== myId()) {
-            sidebarTypingMap.value = { ...sidebarTypingMap.value, [tChatId]: d.username }
-            clearTimeout(sidebarTypingTimers[tChatId])
-            sidebarTypingTimers[tChatId] = setTimeout(() => {
-              const m = { ...sidebarTypingMap.value }
-              delete m[tChatId]
-              sidebarTypingMap.value = m
-            }, 3000)
-            if (tChatId === chatId.value) {
-              typingUser.value = d.username
-              clearTimeout(typingTimeout)
-              typingTimeout = setTimeout(() => { typingUser.value = '' }, 3000)
-            }
-          }
-          return
-        }
-
-        // Sidebar update for every message.created regardless of chat
-        if (payload.type === 'message.created') {
-          // Clear typing for this chat since message was sent
-          if (sidebarTypingMap.value[d.chat_id]) {
-            clearTimeout(sidebarTypingTimers[d.chat_id])
-            const m = { ...sidebarTypingMap.value }
-            delete m[d.chat_id]
-            sidebarTypingMap.value = m
-          }
-          if (d.chat_id === chatId.value) { typingUser.value = ''; clearTimeout(typingTimeout) }
-          const fromMe = d.sender === myId()
-          const idx = sidebarChats.value.findIndex(c => c.id === d.chat_id)
-          if (idx !== -1) {
-            const cur = sidebarChats.value[idx]
-            const arr = sidebarChats.value.map((c, i) => i === idx ? {
-              ...cur,
-              last_message: {
-                content: d.content,
-                created_at: d.created_at,
-                sender_username: d.sender,
-                type: d.type ?? 'text',
-                attachment_url: d.attachment_url ?? null,
-                attachment_type: d.attachment_type ?? null,
-                attachments: d.attachments ?? null,
-              },
-              unread_count: (d.chat_id === chatId.value || fromMe) ? cur.unread_count : (cur.unread_count || 0) + 1,
-            } : c)
-            arr.sort((a, b) => {
-              const ta = a.last_message?.created_at ? Date.parse(a.last_message.created_at) : Date.parse(a.created_at || 0)
-              const tb = b.last_message?.created_at ? Date.parse(b.last_message.created_at) : Date.parse(b.created_at || 0)
-              return tb - ta
-            })
-            sidebarChats.value = arr
-          }
-        }
-
-        // All other logic only applies to the currently open chat
-        const eventChatId = d?.chat_id ?? d?.chatId
-        if (eventChatId && eventChatId !== chatId.value) return
-
-        const shouldStick = isNearBottom()
-
-        if (payload.type === 'message.created') {
-          if (!messages.value.find(m => m.id === d.id)) {
-            messages.value.push(d)
-            newMessageIds.value = new Set([...newMessageIds.value, d.id])
-            setTimeout(() => {
-              newMessageIds.value = new Set([...newMessageIds.value].filter(x => x !== d.id))
-            }, 300)
-          }
-          if (showScrollBtn.value && d.sender !== myId()) {
-            unreadWhileScrolled.value++
-          }
-          // Play notification sound for messages from others, in background or different chat
-          if (d.sender !== myId() && !isMuted(d.chat_id)) {
-            if (document.hidden || d.chat_id !== chatId.value) {
-              playNotifSound()
-            }
-          }
-          await api.markDelivered(chatId.value, d.id).catch(() => {})
-          await markReadIfPossible()
-          if (shouldStick) await scrollToBottom()
-          if (d.sender === myId() && scheduledMessages.value.length) loadScheduled()
-          return
-        }
-        if (payload.type === 'message.edited') {
-          const i = messages.value.findIndex(m => m.id === d.id)
-          if (i !== -1) Object.assign(messages.value[i], d)
-          return
-        }
-        if (payload.type === 'message.deleted') {
-          const i = messages.value.findIndex(m => m.id === d.id)
-          if (i !== -1) messages.value[i].deleted_at = d.deleted_at
-          return
-        }
-        if (payload.type === 'chat.delivered') {
-          if (d?.user && d.user !== myId()) {
-            const id = d.last_delivered_message_id
-            if (id && (!peerDeliveredId.value || String(id) > String(peerDeliveredId.value))) peerDeliveredId.value = id
-          }
-          return
-        }
-        if (payload.type === 'chat.read') {
-          if (d?.user && d.user !== myId()) {
-            const id = d.last_read_message_id
-            if (id && (!peerReadId.value || String(id) > String(peerReadId.value))) peerReadId.value = id
-          }
-          return
-        }
-        if (payload.type === 'message.reaction') {
-          const i = messages.value.findIndex(m => m.id === d.message_id)
-          if (i !== -1) messages.value[i].reactions = sortReactions(d.reactions)
-          return
-        }
-        if (payload.type === 'message.pinned') {
-          const currentId = currentPinned.value?.id
-          pinnedMessages.value = d.pinned_messages || []
-          pinnedIndex.value = stablePinnedIndex(pinnedMessages.value, currentId)
-          return
-        }
-        if (payload.type === 'poll.voted') {
-          const i = messages.value.findIndex(m => m.id === d.message_id)
-          if (i !== -1 && d.poll) {
-            const myV = messages.value[i].poll?.my_votes
-            messages.value[i] = { ...messages.value[i], poll: { ...d.poll, my_votes: myV ?? d.poll.my_votes } }
-          }
-          return
-        }
-      }
-      source.onerror = () => {
-        source.close()
-        if (chatSseStopped || chatSseGen !== gen) return
-        sseStatus.value = 'reconnecting'
-        chatSseTimer = setTimeout(attempt, chatSseDelay)
-        chatSseDelay = Math.min(chatSseDelay * 2, 30000)
-      }
-    } catch {
-      if (chatSseStopped || chatSseGen !== gen) return
-      if (!localStorage.getItem('access_token')) {
-        router.push('/login')
-        return
-      }
-      sseStatus.value = 'reconnecting'
-      chatSseTimer = setTimeout(attempt, chatSseDelay)
-      chatSseDelay = Math.min(chatSseDelay * 2, 30000)
-    }
-  }
-
-  await attempt()
-}
-
-// ─── attach menu / send menu ──────────────────────────────────────
-function toggleAttachMenu() {
-  if (!showAttachMenu.value && attachBtnEl.value) {
-    const rect = attachBtnEl.value.getBoundingClientRect()
-    attachMenuPos.value = { bottom: window.innerHeight - rect.top + 8, left: rect.left }
-  }
-  showAttachMenu.value = !showAttachMenu.value
-}
-
-function openSendMenu() {
-  if (sendBtnEl.value) {
-    const rect = sendBtnEl.value.getBoundingClientRect()
-    sendMenuPos.value = {
-      bottom: window.innerHeight - rect.top + 8,
-      right: window.innerWidth - rect.right,
-    }
-  }
-  showSendMenu.value = !showSendMenu.value
-}
+// ─── Swipe-to-reply & long-press / desktop context menu (composable) ─
+const {
+  swipeMsgId,
+  msgSwipeX,
+  msgSwipeDone,
+  mobileMenu,
+  mobileMenuEl,
+  desktopMenu,
+  desktopMenuEl,
+  desktopMenuStyle,
+  onMsgTouchStart,
+  onMsgTouchEnd,
+  onMsgTouchCancel,
+  openDesktopMenu,
+  closeDesktopMenu,
+  closeMobileMenu,
+} = useSwipeReply({ listEl, isAiChat, startReply, messages, me })
 
 // ─── emoji / reactions ────────────────────────────────────────────
+// Wrappers for composable functions that need ChatView-owned state injected
+
+// toggleEmojiPicker also closes the reaction picker before opening emoji
 function toggleEmojiPicker() {
   closeReactionPicker()
-  if (showEmojiPicker.value) {
-    showEmojiPicker.value = false
-    return
-  }
-  if (emojiButtonEl.value) {
-    const rect = emojiButtonEl.value.getBoundingClientRect()
-    const PICKER_W = 310
-    const center = rect.left + rect.width / 2
-    const clampedLeft = Math.max(PICKER_W / 2 + 8, Math.min(center, window.innerWidth - PICKER_W / 2 - 8))
-    emojiPickerPos.value = {
-      left: clampedLeft,
-      bottom: window.innerHeight - rect.top + 8,
-    }
-  }
-  showEmojiPicker.value = true
+  _composerToggleEmojiPicker()
 }
 
+// onEmojiSelect routes to reaction toggling when reaction picker is open
 function onEmojiSelect(emoji) {
-  if (showFullReactionPicker.value && reactionPickerMsgId.value) {
-    doToggleReaction(reactionPickerMsgId.value, emoji)
-    closeReactionPicker()
-    return
-  }
-  input.value += emoji
-  composerEl.value?.focus()
+  _composerOnEmojiSelect(emoji, { reactionPickerMsgId, showFullReactionPicker, doToggleReaction, closeReactionPicker })
+}
+
+// send — wrap to supply saveEdit (avoids passing MouseEvent as saveEdit param)
+function send() { return _composerSend(() => saveEdit()) }
+
+// onKeydown — wrap to supply ChatView-owned locals
+function onKeydown(e) {
+  return _composerOnKeydown(e, {
+    send,
+    bulkDeleteConfirming,
+    exitSelectionMode,
+    selectionMode,
+    closeDesktopMenu,
+    desktopMenu,
+    cancelReply,
+  })
 }
 
 function openReactionPicker(msgId, event) {
@@ -2368,52 +1897,7 @@ function closeReactionPicker() {
   showFullReactionPicker.value = false
 }
 
-async function doToggleReaction(msgId, emoji) {
-  const msg = messages.value.find(m => m.id === msgId)
-  if (!msg) return
-  navigator.vibrate?.(10)
-
-  const myUser = me.value?.username
-  const existing = (msg.reactions || []).find(r => r.emoji === emoji)
-  const isMineReaction = existing?.users?.includes(myUser)
-
-  if (!msg.reactions) msg.reactions = []
-  if (isMineReaction) {
-    const idx = msg.reactions.findIndex(r => r.emoji === emoji)
-    if (idx !== -1) {
-      const newUsers = msg.reactions[idx].users.filter(u => u !== myUser)
-      if (newUsers.length === 0) msg.reactions.splice(idx, 1)
-      else msg.reactions[idx] = { ...msg.reactions[idx], count: newUsers.length, users: newUsers }
-    }
-  } else {
-    const idx = msg.reactions.findIndex(r => r.emoji === emoji)
-    if (idx !== -1) {
-      msg.reactions[idx] = { ...msg.reactions[idx], count: msg.reactions[idx].count + 1, users: [...msg.reactions[idx].users, myUser] }
-    } else {
-      msg.reactions.push({ emoji, count: 1, users: [myUser] })
-    }
-  }
-
-  try {
-    await api.toggleReaction(chatId.value, msgId, emoji)
-  } catch (e) {
-    showToast(e.message || 'Failed to toggle reaction', 'error')
-  }
-}
-
-function handleReactionClick(m, emoji, event) {
-  const el = event.currentTarget
-  el.classList.remove('toggling')
-  void el.offsetWidth  // force reflow to restart animation on rapid clicks
-  el.classList.add('toggling')
-  setTimeout(() => el.classList.remove('toggling'), 300)
-  doToggleReaction(m.id, emoji)
-}
-
-function isMyReaction(msg, emoji) {
-  if (!msg) return false
-  return (msg.reactions || []).find(r => r.emoji === emoji)?.users?.includes(me.value?.username) ?? false
-}
+// doToggleReaction, handleReactionClick, isMyReaction — owned by useMessageActions
 
 // ─── search ───────────────────────────────────────────────────────
 function toggleSearch() {
@@ -2472,382 +1956,9 @@ function navigateSearchResult(dir) {
   jumpToMessage(searchResults.value[searchIdx.value].id)
 }
 
-// ─── polls ───────────────────────────────────────────────────────
-async function submitPoll(pollData) {
-  showPollForm.value = false
-  try {
-    await api.sendPoll(chatId.value, pollData)
-  } catch (e) {
-    composerError.value = e.message
-    // Re-open the form so the user can retry without losing their poll data
-    showPollForm.value = true
-  }
-}
-
-async function doVotePoll(messageId, optionId) {
-  const msg = messages.value.find(m => m.id === messageId)
-  if (!msg?.poll) return
-  const poll = msg.poll
-  const myVotes = poll.my_votes || []
-
-  // Optimistic update
-  let newMyVotes
-  if (poll.multiple_answers) {
-    newMyVotes = myVotes.includes(optionId)
-      ? myVotes.filter(v => v !== optionId)
-      : [...myVotes, optionId]
-  } else {
-    newMyVotes = myVotes.includes(optionId) ? [] : [optionId]
-  }
-
-  const updatedOptions = poll.options.map(o => {
-    const wasVoted = myVotes.includes(o.id)
-    const willBeVoted = newMyVotes.includes(o.id)
-    if (wasVoted === willBeVoted) return o
-    const delta = willBeVoted ? 1 : -1
-    return { ...o, votes: Math.max(0, o.votes + delta) }
-  })
-  const totalDelta = newMyVotes.length - myVotes.length
-  const i = messages.value.findIndex(m => m.id === messageId)
-  if (i !== -1) {
-    messages.value[i] = {
-      ...messages.value[i],
-      poll: { ...poll, options: updatedOptions, my_votes: newMyVotes, total_votes: poll.total_votes + totalDelta },
-    }
-  }
-
-  try {
-    const res = await api.votePoll(chatId.value, messageId, [optionId])
-    const j = messages.value.findIndex(m => m.id === messageId)
-    if (j !== -1 && res.poll) {
-      messages.value[j] = { ...messages.value[j], poll: res.poll }
-    }
-  } catch (e) {
-    // revert
-    const j = messages.value.findIndex(m => m.id === messageId)
-    if (j !== -1) messages.value[j] = { ...messages.value[j], poll }
-    composerError.value = e.message
-  }
-}
-
-async function doRetractPollVote(messageId) {
-  const msg = messages.value.find(m => m.id === messageId)
-  if (!msg?.poll) return
-  const poll = msg.poll
-  const myCount = (poll.my_votes || []).length
-  const i = messages.value.findIndex(m => m.id === messageId)
-  if (i !== -1) {
-    messages.value[i] = { ...messages.value[i], poll: { ...poll, my_votes: [], total_votes: Math.max(0, (poll.total_votes || 0) - myCount) } }
-  }
-  try {
-    const res = await api.retractPollVote(chatId.value, messageId)
-    const j = messages.value.findIndex(m => m.id === messageId)
-    if (j !== -1 && res.poll) messages.value[j] = { ...messages.value[j], poll: res.poll }
-  } catch (e) {
-    const j = messages.value.findIndex(m => m.id === messageId)
-    if (j !== -1) messages.value[j] = { ...messages.value[j], poll }
-    showToast(e.message || 'Failed to retract vote', 'error')
-  }
-}
-
-// ─── actions ──────────────────────────────────────────────────────
-async function send() {
-  if (isAiChat.value) {
-    const text = input.value.trim()
-    if (!text || aiLoading.value) return
-    input.value = ''
-    if (composerEl.value) composerEl.value.style.height = 'auto'
-    composerEl.value?.focus()
-    await sendToAi(text)
-    return
-  }
-  if (editingId.value) {
-    await saveEdit()
-    return
-  }
-  const text = input.value.trim()
-  const atts = pendingFiles.value.slice()
-  if (!text && !atts.length) return
-  // Guard: don't send if any attachment upload hasn't resolved a URL yet
-  const stillUploading = atts.some(f => f.url === null)
-  if (stillUploading) {
-    composerError.value = 'Please wait for uploads to finish'
-    return
-  }
-  // Capture scroll position BEFORE clearing the composer so optimistic scroll
-  // only kicks in when the user was already near the bottom (reading mode preserved).
-  const wasNearBottom = isNearBottom()
-  const replyId = replyingTo.value?.id ?? null
-  input.value = ''
-  replyingTo.value = null
-  pendingFiles.value = []
-  composerLinkPreview.value = null
-  composerLinkPreviewDismissed.value = false
-  // Reset textarea height after clear
-  if (composerEl.value) { composerEl.value.style.height = 'auto' }
-  composerEl.value?.focus()
-  navigator.vibrate?.(10)
-  try {
-    await api.sendMessage(chatId.value, text, replyId, atts)
-    // Optimistically scroll to bottom after a successful send only when
-    // the user was already near the bottom before they sent the message.
-    if (wasNearBottom) await scrollToBottom()
-  } catch (e) {
-    showToast(e.message || 'Failed to send message', 'error')
-  }
-}
-
-async function sendToAi(text) {
-  aiMessages.value.push({
-    id: 'u-' + Date.now(),
-    sender: me.value?.username || 'You',
-    sender_avatar_url: me.value?.avatar_url || null,
-    content: text,
-    created_at: new Date().toISOString(),
-  })
-  await scrollToBottom()
-  aiLoading.value = true
-
-  const msgs = aiMessages.value.map(m => ({
-    role: m.sender === 'AI Assistant' ? 'assistant' : 'user',
-    content: m.content,
-  }))
-
-  try {
-    const result = await api.aiChat(msgs)
-    aiMessages.value.push({
-      id: 'ai-' + Date.now(),
-      sender: 'AI Assistant',
-      sender_avatar_url: null,
-      content: result.reply,
-      created_at: new Date().toISOString(),
-    })
-  } catch (err) {
-    aiMessages.value.push({
-      id: 'ai-err-' + Date.now(),
-      sender: 'AI Assistant',
-      sender_avatar_url: null,
-      content: '⚠ ' + (err.message || 'Something went wrong'),
-      created_at: new Date().toISOString(),
-    })
-  } finally {
-    aiLoading.value = false
-    await scrollToBottom()
-  }
-}
-
-async function processFile(file) {
-  if (!file) return
-  uploading.value = true
-  // Add placeholder with progress=0 immediately
-  const placeholder = {
-    url: null,
-    type: null,
-    name: file.name,
-    previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
-    progress: 0,
-  }
-  const idx = pendingFiles.value.push(placeholder) - 1
-  try {
-    const result = await api.uploadFile(file, (pct) => {
-      if (pendingFiles.value[idx]) pendingFiles.value[idx].progress = pct
-    })
-    if (pendingFiles.value[idx]) {
-      pendingFiles.value[idx] = {
-        url: result.url,
-        type: result.type,
-        name: result.name || file.name,
-        previewUrl: result.type === 'image' ? result.url : null,
-        progress: 100,
-      }
-    }
-  } catch (err) {
-    // Remove failed upload placeholder
-    pendingFiles.value.splice(idx, 1)
-    showToast(err?.message || 'Upload failed', 'error')
-  } finally {
-    uploading.value = false
-  }
-}
-
-async function onFileSelect(e) {
-  const files = Array.from(e.target.files)
-  e.target.value = ''
-  for (const f of files) await processFile(f)
-}
-
-function cancelFile(idx) {
-  if (idx === undefined) pendingFiles.value = []
-  else pendingFiles.value.splice(idx, 1)
-}
-
-function onDragEnter(e) {
-  if (isAiChat.value) return
-  if (!e.dataTransfer?.types.includes('Files')) return
-  dragCounter++
-  dragging.value = true
-}
-
-function onDragLeave() {
-  dragCounter--
-  if (dragCounter <= 0) {
-    dragCounter = 0
-    dragging.value = false
-  }
-}
-
-async function onDrop(e) {
-  dragCounter = 0
-  dragging.value = false
-  if (isAiChat.value) return
-  const files = Array.from(e.dataTransfer?.files || [])
-  for (const f of files) await processFile(f)
-}
-
-function fmtRecTime(s) {
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-}
-
-function releaseStream() {
-  recordingStream?.getTracks().forEach(t => t.stop())
-  recordingStream = null
-}
-
-async function startRecording() {
-  composerError.value = ''
-  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-    composerError.value = 'Voice recording requires HTTPS — works on localhost or via a secure URL'
-    return
-  }
-  let stream
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-  } catch (e) {
-    composerError.value = e.name === 'NotAllowedError'
-      ? 'Microphone permission denied'
-      : `Microphone error: ${e.message}`
-    return
-  }
-  recordingStream = stream
-
-  const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', '']
-    .find(t => !t || MediaRecorder.isTypeSupported(t))
-  try {
-    mediaRecorder = new MediaRecorder(recordingStream, mimeType ? { mimeType } : {})
-  } catch (e) {
-    composerError.value = `Recording not supported: ${e.message}`
-    releaseStream()
-    return
-  }
-  recordingChunks = []
-  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordingChunks.push(e.data) }
-  mediaRecorder.start()
-  recording.value = true
-  recordingTime.value = 0
-  recordingTimer = setInterval(() => recordingTime.value++, 1000)
-
-  // Start waveform analyser
-  try {
-    waveformAudioCtx = new AudioContext()
-    const source = waveformAudioCtx.createMediaStreamSource(stream)
-    const analyser = waveformAudioCtx.createAnalyser()
-    analyser.fftSize = 64
-    source.connect(analyser)
-    const dataArray = new Uint8Array(analyser.frequencyBinCount)
-    const drawBars = () => {
-      waveformRafId = requestAnimationFrame(drawBars)
-      analyser.getByteFrequencyData(dataArray)
-      waveformBars.value = Array.from(dataArray.slice(0, 16)).map(v => Math.max(4, v / 255 * 24))
-    }
-    drawBars()
-  } catch (e) { /* Web Audio API may be unavailable */ }
-}
-
-function cancelRecording() {
-  clearInterval(recordingTimer)
-  if (waveformRafId) { cancelAnimationFrame(waveformRafId); waveformRafId = null }
-  if (waveformAudioCtx) { waveformAudioCtx.close().catch(() => {}); waveformAudioCtx = null }
-  waveformBars.value = []
-  recording.value = false
-  recordingTime.value = 0
-  if (mediaRecorder) {
-    mediaRecorder.onstop = null
-    if (mediaRecorder.state !== 'inactive') mediaRecorder.stop()
-  }
-  recordingChunks = []
-  releaseStream()
-}
-
-async function sendRecording() {
-  clearInterval(recordingTimer)
-  if (waveformRafId) { cancelAnimationFrame(waveformRafId); waveformRafId = null }
-  if (waveformAudioCtx) { waveformAudioCtx.close().catch(() => {}); waveformAudioCtx = null }
-  waveformBars.value = []
-  recording.value = false
-
-  if (!mediaRecorder) return
-
-  const blob = await new Promise(resolve => {
-    mediaRecorder.onstop = () => {
-      const type = recordingChunks[0]?.type || 'audio/webm'
-      resolve(new Blob(recordingChunks, { type }))
-    }
-    if (mediaRecorder.state !== 'inactive') mediaRecorder.stop()
-    else {
-      const type = recordingChunks[0]?.type || 'audio/webm'
-      resolve(new Blob(recordingChunks, { type }))
-    }
-  })
-
-  releaseStream()
-  recordingChunks = []
-  recordingTime.value = 0
-
-  if (blob.size === 0) return
-
-  // Capture scroll position before the async upload so optimistic scroll
-  // only fires when the user was already at the bottom.
-  const wasNearBottom = isNearBottom()
-  uploading.value = true
-  try {
-    const type = blob.type || 'audio/webm'
-    const ext = type.includes('ogg') ? 'ogg' : 'webm'
-    const file = new File([blob], `voice-${Date.now()}.${ext}`, { type })
-    const result = await api.uploadFile(file)
-    await api.sendMessage(chatId.value, '', null, [{ url: result.url, type: 'audio', name: 'Voice message' }])
-    if (wasNearBottom) await scrollToBottom()
-  } catch (err) {
-    showToast(err?.message || 'Failed to send recording', 'error')
-  } finally {
-    uploading.value = false
-  }
-}
-
-function onKeydown(e) {
-  if (e.key === 'Escape' && bulkDeleteConfirming.value) {
-    bulkDeleteConfirming.value = false
-    return
-  }
-  if (e.key === 'Escape' && selectionMode.value) {
-    exitSelectionMode()
-    return
-  }
-  if (mentionOpen.value && filteredMentions.value.length) {
-    if (e.key === 'ArrowDown') { e.preventDefault(); mentionIdx.value = (mentionIdx.value + 1) % filteredMentions.value.length; return }
-    if (e.key === 'ArrowUp') { e.preventDefault(); mentionIdx.value = (mentionIdx.value - 1 + filteredMentions.value.length) % filteredMentions.value.length; return }
-    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); selectMention(filteredMentions.value[mentionIdx.value].username); return }
-    if (e.key === 'Escape') { closeMentionPopup(); return }
-  }
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    send()
-  }
-  if (e.key === 'Escape') {
-    if (desktopMenu.value) { closeDesktopMenu(); return }
-    if (editingId.value) cancelEdit()
-    else cancelReply()
-  }
-}
+// doVotePoll, doRetractPollVote — owned by useMessageActions
+// submitPoll, send, processFile, onFileSelect, cancelFile, onDragEnter, onDragLeave,
+// onDrop, onKeydown — all owned by useComposer (wrappers/exports above)
 
 function openGroupProfile() {
   if (!isGroup.value) return
@@ -2856,8 +1967,7 @@ function openGroupProfile() {
 
 function onGroupUpdated(patch) {
   chat.value = { ...chat.value, ...patch }
-  const idx = sidebarChats.value.findIndex(c => c.id === chatId.value)
-  if (idx !== -1) sidebarChats.value = sidebarChats.value.map((c, i) => i === idx ? { ...c, ...patch } : c)
+  chatSidebarRef.value?.updateSidebarChat(chatId.value, patch)
 }
 
 function onGroupMembersChanged(newParticipants) {
@@ -2908,19 +2018,7 @@ function replyPreview(msg) {
   return msg.content || 'Message'
 }
 
-function startReply(m) {
-  replyingTo.value = {
-    id: m.id,
-    sender: m.sender,
-    content: m.content,
-    deleted: !!m.deleted_at,
-    type: m.type,
-    attachments: m.attachments,
-    attachment_type: m.attachment_type,
-    attachment_name: m.attachment_name,
-  }
-  composerEl.value?.focus()
-}
+// startReply — owned by useComposer
 
 async function jumpToMessage(id) {
   // Load older pages until the message appears in the DOM
@@ -2951,192 +2049,12 @@ async function maybeJumpFromQuery() {
   router.replace({ query: rest })
 }
 
-function cancelReply() {
-  replyingTo.value = null
-  closeMentionPopup()
-}
+// cancelReply — owned by useComposer
 
-function startForward(m) {
-  forwardingMsg.value = m
-  showForwardModal.value = true
-}
-
-async function doForward(targetChatId) {
-  const m = forwardingMsg.value
-  if (!m) return
-  showForwardModal.value = false
-  forwardingMsg.value = null
-  try {
-    await api.sendForwardedMessage(targetChatId, m.id)
-    showToast('Message forwarded', 'success')
-    if (targetChatId !== chatId.value) {
-      router.push(`/chats/${targetChatId}`)
-    }
-  } catch (e) {
-    showToast(e?.message || 'Failed to forward message', 'error')
-  }
-}
-
-function startEdit(m) {
-  if (m.deleted_at) return
-  editingId.value = m.id
-  editingText.value = m.content || ''
-  input.value = m.content || ''
-  nextTick(() => {
-    composerEl.value?.focus()
-    const el = composerEl.value
-    if (el) {
-      el.setSelectionRange(el.value.length, el.value.length)
-      el.style.height = 'auto'
-      el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-    }
-  })
-}
-
-function cancelEdit() {
-  editingId.value = null
-  editingText.value = ''
-  input.value = loadDraft(chatId.value)
-  closeMentionPopup()
-  nextTick(() => {
-    const el = composerEl.value
-    if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }
-  })
-}
-
-async function saveEdit() {
-  const text = input.value.trim()
-  if (!text) return
-  const id = editingId.value
-  busy.value = true
-  try {
-    const updated = await api.editMessage(chatId.value, id, text)
-    const i = messages.value.findIndex(x => x.id === id)
-    if (i !== -1) Object.assign(messages.value[i], updated)
-    cancelEdit()
-    if (composerEl.value) composerEl.value.style.height = 'auto'
-  } catch (e) {
-    showToast(e?.message || 'Failed to edit message', 'error')
-  } finally { busy.value = false }
-}
-
-const deletingMsgId = ref(null)
-
-async function removeMessage(m) {
-  if (deletingMsgId.value === m.id) {
-    // Second click: confirmed — proceed with deletion
-    deletingMsgId.value = null
-    busy.value = true
-    try {
-      await api.deleteMessage(chatId.value, m.id)
-      const i = messages.value.findIndex(x => x.id === m.id)
-      if (i !== -1) messages.value[i].deleted_at = new Date().toISOString()
-      if (editingId.value === m.id) cancelEdit()
-      showToast('Message deleted', 'success')
-    } catch (e) {
-      showToast(e?.message || 'Failed to delete message', 'error')
-    } finally { busy.value = false }
-    return
-  }
-  // First click: prime confirmation
-  deletingMsgId.value = m.id
-  showToast('Click Delete again to confirm', 'warning')
-  setTimeout(() => { if (deletingMsgId.value === m.id) deletingMsgId.value = null }, 3000)
-}
-
-async function openReadBy(msgId) {
-  readByMsgId.value = msgId
-  readByList.value = []
-  readByLoading.value = true
-  try {
-    readByList.value = await api.getMessageReadBy(chatId.value, msgId)
-  } catch {
-    readByList.value = []
-  } finally {
-    readByLoading.value = false
-  }
-}
-
-async function doPin(messageId) {
-  try {
-    const currentId = currentPinned.value?.id
-    const res = await api.pinMessage(chatId.value, messageId)
-    pinnedMessages.value = res.pinned_messages || []
-    pinnedIndex.value = stablePinnedIndex(pinnedMessages.value, currentId)
-  } catch (e) { showToast(e?.message || 'Failed to update pinned message', 'error') }
-}
-
-function pinnedPreview(pm) {
-  if (pm.content) return pm.content
-  const atts = pm.attachments || []
-  if (atts.length > 0) {
-    const images = atts.filter(a => a.type === 'image')
-    if (images.length) return images.length === 1 ? 'Image' : `${images.length} images`
-    const audios = atts.filter(a => a.type === 'audio')
-    if (audios.length) return 'Voice message'
-    const videos = atts.filter(a => a.type === 'video')
-    if (videos.length) return 'Video message'
-    return atts[0]?.name || 'File'
-  }
-  if (pm.attachment_type === 'image') return 'Image'
-  if (pm.attachment_type === 'audio') return 'Voice message'
-  if (pm.attachment_type === 'video') return 'Video message'
-  if (pm.attachment_url) return pm.attachment_name || 'File'
-  return ''
-}
-
-function lockPinnedNav() {
-  pinnedNavLock = true
-  clearTimeout(pinnedNavLockTimer)
-  pinnedNavLockTimer = setTimeout(() => { pinnedNavLock = false }, 1500)
-}
-
-function stablePinnedIndex(newList, currentId) {
-  if (!newList.length) return 0
-  if (currentId) {
-    const idx = newList.findIndex(p => p.id === currentId)
-    if (idx >= 0) return idx
-  }
-  return Math.min(pinnedIndex.value, newList.length - 1)
-}
-
-async function clickPinnedBar() {
-  const pm = currentPinned.value
-  if (!pm) return
-  const len = pinnedMessages.value.length
-  const nextIdx = len > 1 ? (pinnedIndex.value - 1 + len) % len : pinnedIndex.value
-  lockPinnedNav()
-  await jumpToMessage(pm.id)
-  pinnedIndex.value = nextIdx
-}
-
-async function navigatePin(delta) {
-  const len = pinnedMessages.value.length
-  if (!len) return
-  const nextIdx = (pinnedIndex.value + delta + len) % len
-  pinnedIndex.value = nextIdx
-  lockPinnedNav()
-  const pm = pinnedMessages.value[nextIdx]
-  if (pm) await jumpToMessage(pm.id)
-}
-
-function updatePinnedIndexFromScroll() {
-  if (pinnedNavLock || !pinnedMessages.value.length || !listEl.value) return
-  const container = listEl.value
-  const bottom = container.getBoundingClientRect().bottom
-  // Find the newest (highest index) pin whose element hasn't scrolled past the bottom fold.
-  // When scrolling UP, a pin is "scrolled past" once its element exits below the container.
-  let targetIdx = 0
-  for (let i = pinnedMessages.value.length - 1; i >= 0; i--) {
-    const el = document.getElementById(`msg-${pinnedMessages.value[i].id}`)
-    if (!el) continue
-    if (el.getBoundingClientRect().top <= bottom) {
-      targetIdx = i
-      break
-    }
-  }
-  if (pinnedIndex.value !== targetIdx) pinnedIndex.value = targetIdx
-}
+// startForward, doForward (local wrapper above), startEdit, cancelEdit, saveEdit,
+// deletingMsgId, removeMessage, openReadBy, doPin, pinnedPreview, lockPinnedNav,
+// stablePinnedIndex, clickPinnedBar (local wrapper above), navigatePin (local wrapper above),
+// updatePinnedIndexFromScroll (local wrapper above) — all owned by useMessageActions
 
 async function logout() {
   await api.logout()
@@ -3219,17 +2137,15 @@ async function createChat() {
     })
     closeCreate()
     // Optimistic insert — появляется мгновенно без перезагрузки
-    if (!sidebarChats.value.find(c => c.id === newChat.id)) {
-      sidebarChats.value.unshift({
-        id: newChat.id,
-        is_group: newChat.is_group,
-        title: newChat.title,
-        display_name: newChat.title || newChat.peer_username || (isGroup ? 'Group chat' : 'New chat'),
-        last_message: null,
-        unread_count: 0,
-        created_at: new Date().toISOString(),
-      })
-    }
+    chatSidebarRef.value?.addSidebarChat({
+      id: newChat.id,
+      is_group: newChat.is_group,
+      title: newChat.title,
+      display_name: newChat.title || newChat.peer_username || (isGroup ? 'Group chat' : 'New chat'),
+      last_message: null,
+      unread_count: 0,
+      created_at: new Date().toISOString(),
+    })
     router.push(`/chats/${newChat.id}`)
   } catch (e) { createError.value = e.message }
   finally { creating.value = false }
@@ -3237,56 +2153,10 @@ async function createChat() {
 
 watch(showOnlinePanel, (val) => { if (val) loadOnlineUsers() })
 
-watch(sidebarSearchOpen, (val) => {
-  if (val) nextTick(() => sidebarFilterInputRef.value?.focus())
-})
-
-// ─── Smart repositioning of mobile long-press menu ────────────────
-// Runs after Vue updates the DOM so we can measure actual menu dimensions.
-watch(mobileMenu, (newVal) => {
-  if (!newVal || newVal.adjusted) return
-  if (!mobileMenuEl.value) return
-  const el = mobileMenuEl.value
-  const menuW = el.offsetWidth
-  const menuH = el.offsetHeight
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const EDGE = 8
-  const SAFE_BOTTOM = 20   // covers env(safe-area-inset-bottom) on most devices
-  const tx = newVal.rawX
-  const ty = newVal.rawY
-  // Prefer opening below touch, fall back to above when not enough room
-  let y = ty + 16
-  if (y + menuH > vh - EDGE - SAFE_BOTTOM) y = ty - menuH - 16
-  y = Math.max(EDGE, Math.min(y, vh - menuH - EDGE - SAFE_BOTTOM))
-  // Center horizontally on touch point, clamp to edges
-  let x = tx - menuW / 2
-  x = Math.max(EDGE, Math.min(x, vw - menuW - EDGE))
-  mobileMenu.value = { ...newVal, x, y, adjusted: true }
-}, { flush: 'post' })
-
-// ─── Smart repositioning of sidebar context menu ─────────────────
-// Runs after Vue renders the menu element so we can read its actual size
-// and clamp it to the viewport — critical on narrow mobile screens (≤390px)
-// where the sidebar is only 280px wide and an unclamped right-edge position
-// would push the menu off-screen.
-watch(sidebarItemMenu, (newVal) => {
-  if (!newVal || newVal.adjusted) return
-  if (!sidebarCtxMenuEl.value) return
-  const el = sidebarCtxMenuEl.value
-  const menuW = el.offsetWidth || 130
-  const menuH = el.offsetHeight || 50
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const EDGE = 8
-  const SAFE_BOTTOM = 20
-  let x = Math.max(EDGE, Math.min(newVal.x, vw - menuW - EDGE))
-  let y = Math.max(EDGE, Math.min(newVal.y, vh - menuH - EDGE - SAFE_BOTTOM))
-  sidebarItemMenu.value = { ...newVal, x, y, adjusted: true }
-}, { flush: 'post' })
-
+// useComposer owns the draft→localStorage watcher. ChatView adds a separate
+// watcher solely to keep the sidebar draft preview in sync via updateDraft().
 watch(input, (val) => {
-  if (!editingId.value && !isAiChat.value) saveDraft(chatId.value, val)
+  if (!editingId.value && !isAiChat.value) chatSidebarRef.value?.updateDraft(chatId.value, val)
 })
 
 // ─── Focus traps for modals ───────────────────────────────────────
@@ -3302,8 +2172,8 @@ watch(chatId, async (newId, oldId) => {
   if (!newId || newId === oldId) return
   if (window.innerWidth < 640) sidebarHidden.value = true
   stopChatSse()
-  clearTimeout(typingTimeout)
-  clearTimeout(typingDebounce)
+  Object.values(typingUserTimers).forEach(clearTimeout)
+  Object.keys(typingUsersMap).forEach(k => delete typingUsersMap[k])
   messages.value = []
   nextCursor.value = null
   hasMore.value = false
@@ -3317,23 +2187,26 @@ watch(chatId, async (newId, oldId) => {
   pinnedIndex.value = 0
   peerDeliveredId.value = null
   peerReadId.value = null
-  typingUser.value = ''
+  peerReadAt.value = null
   unreadDividerBeforeId.value = null
   unreadDividerCount.value = 0
+  editingId.value = null
+  editingText.value = ''
   cancelEdit()
   cancelReply()
   cancelFile()
   cancelRecording()
-  clearTimeout(linkPreviewDebounce)
+  clearTimeout(linkPreviewDebounce.value)
   composerLinkPreview.value = null
   composerLinkPreviewDismissed.value = false
   composerLinkPreviewLoading.value = false
-  dragCounter = 0
+  dragCounterReset()
   dragging.value = false
   lightboxOpen.value = false
   composerError.value = ''
   deletingMsgId.value = null
   showEmojiPicker.value = false
+  closeMentionPopup()
   closeReactionPicker()
   showGroupProfile.value = false
   scheduledMessages.value = []
@@ -3347,11 +2220,8 @@ watch(chatId, async (newId, oldId) => {
   forwardingMsg.value = null
   exitSelectionMode()
   readByMsgId.value = null
-  mobileMenu.value = null
-  swipeMsgId.value = null
-  msgSwipeX.value = 0
-  msgSwipeDone.value = false
-  clearTimeout(_msgLongPressTimer)
+  closeMobileMenu()
+  onMsgTouchCancel()
   await load()
   await connectSse()
   if (!isAiChat.value) {
@@ -3361,145 +2231,7 @@ watch(chatId, async (newId, oldId) => {
   await maybeJumpFromQuery()
 }, { immediate: false })
 
-// ─── Mobile message swipe-to-reply & long-press menu ─────────────
-function onMsgTouchStart(e, m) {
-  if (window.innerWidth > 640 || isAiChat.value) return
-  if (m.type === 'system' || m.deleted_at) return
-  if (mobileMenu.value) return
-
-  _msgSwipeId = m.id
-  _msgSwipeStartX = e.touches[0].clientX
-  _msgSwipeStartY = e.touches[0].clientY
-  _msgSwipeDecided = null
-  _msgLongPressTriggered = false
-  swipeMsgId.value = m.id
-  msgSwipeX.value = 0
-  msgSwipeDone.value = false
-
-  _msgLongPressTimer = setTimeout(() => {
-    _msgLongPressTriggered = true
-    navigator.vibrate?.(30)
-    // Cancel any in-progress swipe
-    _msgSwipeId = null
-    swipeMsgId.value = null
-    msgSwipeX.value = 0
-    // Store raw touch position; watcher will clamp to viewport after render
-    const tx = e.touches[0].clientX
-    const ty = e.touches[0].clientY
-    mobileMenu.value = { msg: m, rawX: tx, rawY: ty, x: -9999, y: -9999, adjusted: false }
-  }, 500)
-}
-
-function onMsgTouchEnd(e, m) {
-  clearTimeout(_msgLongPressTimer)
-  if (_msgLongPressTriggered) return
-
-  const swipeXValue = msgSwipeX.value
-  const hadSwipe = _msgSwipeId !== null
-
-  _msgSwipeId = null
-  _msgSwipeDecided = null
-  msgSwipeDone.value = true
-  msgSwipeX.value = 0
-
-  setTimeout(() => {
-    if (swipeMsgId.value === m.id) {
-      swipeMsgId.value = null
-      msgSwipeDone.value = false
-    }
-  }, 280)
-
-  if (hadSwipe && swipeXValue >= 60) {
-    startReply(m)
-  }
-}
-
-function onMsgTouchCancel() {
-  clearTimeout(_msgLongPressTimer)
-  _msgLongPressTriggered = false
-  _msgSwipeId = null
-  _msgSwipeDecided = null
-  msgSwipeDone.value = true
-  msgSwipeX.value = 0
-  setTimeout(() => {
-    swipeMsgId.value = null
-    msgSwipeDone.value = false
-  }, 280)
-}
-
-// Must be registered with { passive: false } to call preventDefault.
-function _msgAreaTouchMove(e) {
-  if (window.innerWidth > 640 || !_msgSwipeId || _msgLongPressTriggered) return
-
-  const touch = e.touches[0]
-  const dx = touch.clientX - _msgSwipeStartX
-  const dy = touch.clientY - _msgSwipeStartY
-
-  if (_msgSwipeDecided === null) {
-    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
-    _msgSwipeDecided = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
-  }
-
-  if (_msgSwipeDecided === 'v') {
-    // Vertical scroll: cancel swipe and long press, let scroll proceed naturally
-    clearTimeout(_msgLongPressTimer)
-    _msgSwipeId = null
-    swipeMsgId.value = null
-    return
-  }
-
-  // Confirmed horizontal swipe: cancel long press, prevent page scroll
-  clearTimeout(_msgLongPressTimer)
-  e.preventDefault()
-  e.stopPropagation() // prevents sidebar swipe from also triggering
-
-  // Rightward only, rubber-band resistance after 60 px
-  const raw = Math.max(0, dx)
-  const x = raw <= 60 ? raw : 60 + (raw - 60) * 0.25
-  msgSwipeX.value = Math.min(x, 80)
-}
-
-function closeMobileMenu() {
-  mobileMenu.value = null
-}
-
-function openDesktopMenu(e, m) {
-  if (m.deleted_at || m.type === 'system') return
-  desktopMenu.value = { msg: m, x: e.clientX, y: e.clientY, anchorEvent: e }
-  nextTick(() => {
-    const el = desktopMenuEl.value
-    if (!el) return
-    const menuW = el.offsetWidth || 220
-    const menuH = el.offsetHeight || 300
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const MARGIN = 8
-    let x = e.clientX
-    let y = e.clientY
-    if (x + menuW > vw - MARGIN) x = vw - menuW - MARGIN
-    if (x < MARGIN) x = MARGIN
-    if (y + menuH > vh - MARGIN) y = vh - menuH - MARGIN
-    if (y < MARGIN) y = MARGIN
-    desktopMenuStyle.value = {
-      left: x + 'px',
-      top: y + 'px',
-      transformOrigin: e.clientX - x < menuW / 2 ? 'top left' : 'top right',
-    }
-  })
-}
-
-function closeDesktopMenu() {
-  desktopMenu.value = null
-  desktopMenuStyle.value = {}
-}
-
-function copyMessageText(m) {
-  if (m.content) {
-    showToast('Copied!', 'success')
-    navigator.clipboard?.writeText(m.content).catch(() => {})
-  }
-  closeMobileMenu()
-}
+// copyMessageText — local wrapper above (delegates to useMessageActions)
 
 // ─── Mobile swipe gesture to open / close sidebar ────────────────
 // Strategy: use a non-passive touchmove listener (registered imperatively
@@ -3575,7 +2307,7 @@ function onSwipeTouchCancel() { swipeDecided = null }
 
 // ─── Keyboard shortcuts ───────────────────────────────────────────
 function navigateChat(direction) {
-  const chats = filteredSidebarChats.value
+  const chats = chatSidebarRef.value?.filteredSidebarChats || []
   if (!chats.length) return
   const idx = chats.findIndex(c => c.id === chatId.value)
   const next = chats[idx + direction]
@@ -3590,8 +2322,7 @@ function onGlobalKeydown(e) {
   // Ctrl+K / Cmd+K — focus sidebar search
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault()
-    if (!sidebarSearchOpen.value) sidebarSearchOpen.value = true
-    nextTick(() => sidebarFilterInputRef.value?.focus())
+    chatSidebarRef.value?.focusSidebarSearch()
     return
   }
   // ? — show keyboard shortcuts (only when no input is focused)
@@ -3629,7 +2360,7 @@ function onGlobalKeydown(e) {
     if (readByMsgId.value) { readByMsgId.value = null; return }
     if (bulkDeleteConfirming.value) { bulkDeleteConfirming.value = false; return }
     if (selectionMode.value) { exitSelectionMode(); return }
-    if (sidebarItemMenu.value) { closeSidebarMenu(); return }
+    chatSidebarRef.value?.closeSidebarMenu()
     if (showKeyboardShortcutsModal.value) { showKeyboardShortcutsModal.value = false; return }
   }
 }
@@ -3645,16 +2376,8 @@ function onWindowResize() {
 // Two-frame approach: first rAF sets --vvh, second rAF scrolls the
 // messages list to the bottom (after layout recalculates with new height)
 // so the last message stays visible above the composer.
+// NOTE: _onComposerFocusIn is now owned and registered by useComposer.
 let _vvhRafId = null
-
-// Proactive VVH update fired when the composer textarea gains focus on mobile.
-// Sets --vvh immediately so the shell starts shrinking before the keyboard is
-// fully rendered, reducing the visible layout jump.
-function _onComposerFocusIn() {
-  if (window.innerWidth <= 640 && window.visualViewport) {
-    document.documentElement.style.setProperty('--vvh', window.visualViewport.height + 'px')
-  }
-}
 
 function updateVVH() {
   // Capture scroll state now, before the rAF changes clientHeight.
@@ -3679,7 +2402,10 @@ function updateVVH() {
 }
 
 onMounted(async () => {
-  [me.value] = await Promise.all([api.me()])
+  // Capture phase: <img> load / <video> loadedmetadata do not bubble.
+  listEl.value?.addEventListener('load', onMediaLoadPin, true)
+  listEl.value?.addEventListener('loadedmetadata', onMediaLoadPin, true)
+  ;[me.value] = await Promise.all([api.me()])
   await Promise.all([load(), loadSidebarChats()])
   const map = {}
   for (let i = 0; i < localStorage.length; i++) {
@@ -3689,7 +2415,7 @@ onMounted(async () => {
       if (val) map[key.slice(6)] = val
     }
   }
-  draftMap.value = map
+  chatSidebarRef.value?.setDraftMap(map)
   input.value = loadDraft(chatId.value)
   await connectSse()
   if (!isAiChat.value) {
@@ -3708,10 +2434,8 @@ onMounted(async () => {
   window.visualViewport?.addEventListener('resize', updateVVH)
   window.visualViewport?.addEventListener('scroll', updateVVH)
   document.addEventListener('touchmove', _swipeTouchMove, { passive: false })
-  if (listEl.value) listEl.value.addEventListener('touchmove', _msgAreaTouchMove, { passive: false })
-  // Proactively set --vvh when the composer is focused on mobile so the shell
-  // resizes before the keyboard finishes appearing, reducing the layout jump.
-  if (composerEl.value) composerEl.value.addEventListener('focusin', _onComposerFocusIn)
+  // _onComposerFocusIn is registered by useComposer's onMounted — no duplicate needed here.
+  // _msgAreaTouchMove is registered by useSwipeReply's watchEffect — no duplicate needed here.
   updateVVH()
   api.ping().catch(() => {})
   loadOnlineUsers()
@@ -3723,10 +2447,12 @@ onBeforeUnmount(() => {
   stopChatSse()
   if (pingInterval) clearInterval(pingInterval)
   if (onlineUsersInterval) clearInterval(onlineUsersInterval)
-  clearTimeout(typingTimeout)
-  clearTimeout(typingDebounce)
-  clearTimeout(linkPreviewDebounce)
-  Object.values(sidebarTypingTimers).forEach(clearTimeout)
+  Object.values(typingUserTimers).forEach(clearTimeout)
+  // typingDebounce and linkPreviewDebounce are cleared by useComposer's onBeforeUnmount.
+  const _sidebarTypingTimers = chatSidebarRef.value?.sidebarTypingTimers
+  if (_sidebarTypingTimers) Object.values(_sidebarTypingTimers).forEach(clearTimeout)
+  listEl.value?.removeEventListener('load', onMediaLoadPin, true)
+  listEl.value?.removeEventListener('loadedmetadata', onMediaLoadPin, true)
   document.removeEventListener('visibilitychange', markReadIfPossible)
   document.removeEventListener('paste', onPaste)
   document.removeEventListener('keydown', onGlobalKeydown)
@@ -3734,14 +2460,12 @@ onBeforeUnmount(() => {
   window.visualViewport?.removeEventListener('resize', updateVVH)
   window.visualViewport?.removeEventListener('scroll', updateVVH)
   document.removeEventListener('touchmove', _swipeTouchMove)
-  if (listEl.value) listEl.value.removeEventListener('touchmove', _msgAreaTouchMove)
-  if (composerEl.value) composerEl.value.removeEventListener('focusin', _onComposerFocusIn)
-  clearTimeout(_msgLongPressTimer)
+  // _onComposerFocusIn is removed by useComposer's onBeforeUnmount — no duplicate needed here.
+  // _msgAreaTouchMove and _msgLongPressTimer are cleaned up by useSwipeReply's onBeforeUnmount.
   if (_vvhRafId) cancelAnimationFrame(_vvhRafId)
   // Restore default viewport so other routes can zoom normally.
   const _metaVP = document.querySelector('meta[name="viewport"]')
   if (_metaVP) _metaVP.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover'
-  cancelRecording()
   document.title = 'RealtimeChat'
 })
 </script>
