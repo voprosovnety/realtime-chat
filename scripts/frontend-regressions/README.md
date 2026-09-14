@@ -50,7 +50,8 @@ A fresh API seed/login is required even for selected scenarios.
   for `/api/chats/ai/typing`. No masking/no-op from portfolio capture is imported. Actual
   AI requests are blocked and counted as failures; no answer is sent or modeled.
 - **Mobile smoke:** Chromium 390 × 844 touch viewport, composer bounds, no horizontal
-  overflow, preservation of scrolled-up position on receive, scroll-to-bottom and reply.
+  overflow, preservation of scrolled-up position on receive and after a deliberately
+  delayed real delivery receipt, scroll-to-bottom and reply.
   This does not cover a physical device, Safari, Android or a software keyboard.
 
 These are focused regressions, not comprehensive UI coverage. Reconnect verifies delivery

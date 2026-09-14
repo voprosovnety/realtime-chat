@@ -168,6 +168,33 @@ export async function runBrowser({ browser, base, request, report, restartHub, s
       expect(await area.evaluate(el => el.scrollTop)).toBeLessThan(100);
       await bob.page.getByRole('button', { name: 'Scroll to bottom' }).click();
       await expect.poll(() => area.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(30);
+      // A receipt may finish after the reader has scrolled away from the bottom.
+      // Hold the real HTTP request to make that ordering deterministic.
+      const receiptPattern = `**/api/chats/${chat.id}/delivered`;
+      let releaseReceipt, receiptHeld = false;
+      const receiptGate = new Promise(resolve => { releaseReceipt = resolve; });
+      await bob.page.route(receiptPattern, async route => {
+        receiptHeld = true;
+        await receiptGate;
+        await route.continue();
+      });
+      try {
+        const delayed = await request(`/api/chats/${chat.id}/messages`, { method: 'POST', status: 201, token: tokens[0], body: { content: 'Synthetic delayed receipt' } });
+        await expect(bob.page.locator(`#msg-${delayed.id}`)).toHaveCount(1);
+        await expect.poll(() => receiptHeld).toBe(true);
+        await area.evaluate(el => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')); });
+        const read = bob.page.waitForResponse(r => r.url().endsWith(`/api/chats/${chat.id}/read`)
+          && r.request().method() === 'POST' && r.request().postDataJSON()?.last_read_message_id === delayed.id);
+        releaseReceipt();
+        expect((await read).status()).toBe(200);
+        await bob.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        expect(await area.evaluate(el => el.scrollTop), 'A delayed receipt must preserve the reader scroll position').toBeLessThan(100);
+      } finally {
+        releaseReceipt();
+        await bob.page.unroute(receiptPattern);
+      }
+      await bob.page.getByRole('button', { name: 'Scroll to bottom' }).click();
+      await expect.poll(() => area.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(30);
       const composer = bob.page.getByPlaceholder('Type a message…');
       await composer.fill('Synthetic mobile reply');
       const bounds = await composer.boundingBox();

@@ -198,9 +198,11 @@ export function useChatSse({
                 playNotifSound()
               }
             }
+            // Apply the arrival-time scroll intent before slow receipts can
+            // finish after the reader has already scrolled up.
+            if (shouldStick) await scrollToBottom()
             await markDelivered(chatId.value, d.id)
             await markReadIfPossible()
-            if (shouldStick) await scrollToBottom()
             if (d.sender === myId() && scheduledMessages.value.length) loadScheduled()
             return
           }
