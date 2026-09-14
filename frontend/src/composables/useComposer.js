@@ -270,6 +270,8 @@ export function useComposer({
     })
     clearTimeout(typingDebounce)
     typingDebounce = setTimeout(() => {
+      // The AI conversation is local; only persisted chats have a typing endpoint.
+      if (isAiChat.value || !chatId.value) return
       api.sendTyping(chatId.value).catch(() => {})
     }, 400)
     // Link preview debounce

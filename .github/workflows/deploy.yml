@@ -1,0 +1,29 @@
+name: Deployment (disabled)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Deployment environment (deployment is currently disabled)
+        type: choice
+        required: true
+        options:
+          - development
+          - production
+
+permissions: {}
+
+concurrency:
+  group: deployment-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  disabled:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    environment: ${{ inputs.target }}
+    steps:
+      - name: Deployment is intentionally disabled
+        run: |
+          echo '::error::Legacy SSH deployment has been removed. Re-enable only after a separately authorized deployment review: branch and successful-CI gates, environment protections, verified SSH host identity, and build-before-replacement.'
+          exit 1

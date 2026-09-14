@@ -26,7 +26,7 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/.well-known/mercure': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost',
         changeOrigin: true,
       },
     },
