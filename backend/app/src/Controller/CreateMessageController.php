@@ -64,7 +64,12 @@ final class CreateMessageController
         $forwardedFromId = $data['forwarded_from_id'] ?? null;
         if ($forwardedFromId) {
             $origMsg = $em->getRepository(Message::class)->find($forwardedFromId);
-            if (!$origMsg || $origMsg->getDeletedAt() !== null) {
+            $sourceMembership = $origMsg ? $em->getRepository(ChatMember::class)->findOneBy([
+                'chat' => $origMsg->getChat(),
+                'member' => $me,
+            ]) : null;
+            // Keep missing, deleted and inaccessible sources indistinguishable.
+            if (!$sourceMembership || $origMsg->getDeletedAt() !== null) {
                 return new JsonResponse(['error' => 'invalid forwarded_from_id'], 400);
             }
             $content        = $origMsg->getContent();

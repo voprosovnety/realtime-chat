@@ -1,0 +1,18 @@
+# Standalone disposable test runner; no production services or data volumes.
+services:
+  test:
+    build:
+      context: ./backend
+      target: test
+    environment:
+      APP_ENV: test
+      APP_DEBUG: 1
+      DATABASE_URL: "sqlite:///:memory:"
+    volumes:
+      - ./backend/app/tests:/var/www/backend/app/tests:ro
+      - ./backend/app/phpunit.dist.xml:/var/www/backend/app/phpunit.dist.xml:ro
+      - ./backend/app/.env.test:/var/www/backend/app/.env.test:ro
+    tmpfs:
+      - /var/www/backend/app/config/jwt
+      - /var/www/backend/app/var
+      - /var/www/backend/app/.phpunit.cache

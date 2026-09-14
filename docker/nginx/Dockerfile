@@ -1,7 +1,7 @@
 FROM node:24-alpine AS frontend-build
 WORKDIR /app
 COPY frontend/package*.json ./
-RUN npm install --frozen-lockfile
+RUN npm ci
 ARG CACHE_BUST=unknown
 RUN echo "Cache bust: $CACHE_BUST"
 COPY frontend/ .
