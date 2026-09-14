@@ -1,5 +1,18 @@
-# Vue 3 + Vite
+# RealtimeChat frontend
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Vue 3 SPA built with Vite. Install the locked dependency graph and start the hot-reload
+server with:
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+```bash
+npm ci
+npm run dev
+```
+
+See the repository [README](../README.md) for the Docker backend, production build,
+testing, CI and project architecture.
+
+Browser tests: `npm run test:modeled` for controlled refresh failures and
+`npm run test:browser -- --build` for an isolated real backend with desktop/mobile smoke.
+Install Chromium with `npx playwright install --with-deps chromium` first, or use the
+installed Chrome channel via `REGRESSION_BROWSER_CHANNEL=chrome`.
+See [test coverage and cleanup](../scripts/frontend-regressions/README.md).
